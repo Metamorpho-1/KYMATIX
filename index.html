@@ -3,229 +3,240 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kymatix v2.2 // Obsidian Ultra</title>
+    <title>Kymatix // Obsidian Ultra</title>
     <style>
         :root {
             --accent: #f7d08a;
-            --glass: rgba(15, 15, 26, 0.85);
-            --line-width: 60px;
+            --glass: rgba(15, 15, 26, 0.88);
+            --line-width: 80px;
         }
 
-        /* 1. Reset & Global Aesthetics */
-        * { 
-            margin: 0; padding: 0; box-sizing: border-box; 
-            overflow: hidden; font-family: 'Syne', sans-serif; 
-            user-select: none; -webkit-user-select: none;
+        /* 1. Global & Typography Fix */
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Syne', sans-serif; user-select: none; }
+        body { background: #050508; color: white; overflow: hidden; cursor: none; }
+
+        /* Custom Cursor */
+        #cursor { position: fixed; width: 15px; height: 15px; border: 2px solid var(--accent); border-radius: 50%; pointer-events: none; z-index: 3000; transition: transform 0.06s linear; mix-blend-mode: difference; }
+
+        /* 2. THE INTRO (Sleeker) */
+        #intro-overlay {
+            position: fixed; inset: 0; z-index: 2000;
+            background: #050508; display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            transition: opacity 1.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
+        .terminal-text { font-family: monospace; font-size: 0.75rem; color: var(--accent); margin-bottom: 20px; letter-spacing: 2px; text-transform: uppercase; }
+        .loader-bar { width: 180px; height: 1px; background: rgba(255,255,255,0.1); position: relative; overflow: hidden; }
+        .loader-progress { position: absolute; width: 100%; height: 100%; background: var(--accent); left: -100%; animation: load 2s ease-in-out forwards; }
+        @keyframes load { to { left: 0; } }
 
-        body { background: #050508; cursor: none; }
-
-        /* Custom Interactive Cursor */
-        #cursor {
-            position: fixed; width: 20px; height: 20px; border: 2px solid var(--accent);
-            border-radius: 50%; pointer-events: none; z-index: 1000;
-            transition: transform 0.05s linear; mix-blend-mode: difference;
-        }
-
-        /* 2. Central Control Hub */
+        /* 3. THE UI BOX (Restored & Unsqueezed) */
         #ui-layer {
             position: fixed; z-index: 100;
             top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: var(--glass); backdrop-filter: blur(50px);
+            background: var(--glass); backdrop-filter: blur(40px);
             border: 1px solid rgba(255,255,255,0.08);
-            padding: 60px; border-radius: 40px; text-align: center;
-            box-shadow: 0 50px 120px rgba(0,0,0,0.9);
+            padding: 70px 90px; border-radius: 40px; text-align: center;
+            box-shadow: 0 40px 100px rgba(0,0,0,0.8);
             transition: all 0.8s cubic-bezier(0.19, 1, 0.22, 1);
+            width: auto; min-width: 500px;
         }
 
-        h1 {
-            font-size: 5rem; font-weight: 800; letter-spacing: -5px;
-            background: linear-gradient(to bottom, #fff, #777);
+        h1 { 
+            font-size: 5.5rem; font-weight: 800; 
+            letter-spacing: -2px; /* Fixed: was too squeezed */
+            line-height: 1; margin: 0;
+            background: linear-gradient(to bottom, #fff, #888); 
             background-clip: text; -webkit-background-clip: text; 
-            -webkit-text-fill-color: transparent;
+            -webkit-text-fill-color: transparent; 
         }
 
-        h1::after {
-            content: ''; display: block; width: var(--line-width); height: 5px;
-            background: var(--accent); margin: 25px auto; border-radius: 10px;
-            box-shadow: 0 0 30px var(--accent); transition: width 0.1s ease;
+        h1::after { 
+            content: ''; display: block; 
+            width: var(--line-width); height: 4px; 
+            background: var(--accent); margin: 30px auto 0; 
+            border-radius: 10px; box-shadow: 0 0 25px var(--accent); 
+            transition: width 0.15s ease-out; 
         }
 
-        /* 3. Button Styles */
-        .btn {
-            background: white; color: black; padding: 20px 45px;
-            border-radius: 100px; font-weight: 900; cursor: pointer;
-            transition: 0.3s; border: none; text-transform: uppercase;
-            font-size: 0.9rem; letter-spacing: 1px;
+        p.sub-status { letter-spacing: 6px; opacity: 0.4; margin-top: 15px; margin-bottom: 50px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; }
+
+        /* 4. THE PLAYER (Surgical Polish) */
+        #player-container {
+            position: fixed; bottom: 50px; left: 50%; transform: translateX(-50%);
+            width: 450px; z-index: 101; background: var(--glass);
+            padding: 15px 25px; border-radius: 100px;
+            backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1);
+            display: flex; align-items: center; gap: 20px;
+            transition: opacity 0.5s ease, transform 0.5s ease;
         }
 
-        .btn:hover { transform: scale(1.05); box-shadow: 0 0 40px rgba(255,255,255,0.2); }
+        .btn { background: white; color: black; padding: 16px 35px; border-radius: 100px; font-weight: 800; cursor: pointer; border: none; font-size: 0.75rem; letter-spacing: 1px; }
+        .play-pause-btn { background: none; color: white; border: 1px solid rgba(255,255,255,0.2); width: 45px; height: 45px; border-radius: 50%; cursor: pointer; flex-shrink: 0; font-size: 0.6rem; display: flex; align-items: center; justify-content: center; }
 
-        .btn-secondary {
-            position: fixed; bottom: 40px; z-index: 101;
-            background: rgba(255, 255, 255, 0.05); color: white;
-            padding: 15px 35px; border-radius: 100px; font-weight: 800;
-            border: 1px solid rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px);
-        }
+        input[type="range"] { flex-grow: 1; appearance: none; background: rgba(255,255,255,0.1); height: 2px; outline: none; }
+        input[type="range"]::-webkit-slider-thumb { appearance: none; width: 10px; height: 10px; background: var(--accent); border-radius: 50%; cursor: pointer; box-shadow: 0 0 10px var(--accent); }
 
-        #pause-btn { left: 40px; }
-        #snapshot-btn { right: 40px; }
-
-        input[type="file"] { position: absolute; opacity: 0; width: 100%; height: 100%; left:0; top:0; cursor: pointer;}
-
-        /* Logic classes */
-        .hidden { opacity: 0; visibility: hidden; transform: translate(-50%, -45%) scale(0.95); }
-        .control-hidden { opacity: 0; pointer-events: none; }
+        .hidden { opacity: 0; pointer-events: none; transform: translate(-50%, -40%) scale(0.95); }
+        .player-hidden { opacity: 0; transform: translate(-50%, 20px); pointer-events: none; }
     </style>
-    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet">
 </head>
 <body>
 
     <div id="cursor"></div>
+
+    <div id="intro-overlay">
+        <div class="terminal-text" id="terminal">SYST_INIT: KYMATIX_CORE</div>
+        <div class="loader-bar"><div class="loader-progress"></div></div>
+    </div>
+
     <canvas id="canvas"></canvas>
 
     <div id="ui-layer">
         <h1>KYMATIX</h1>
-        <p style="letter-spacing: 8px; opacity: 0.3; margin-bottom: 45px; font-size: 0.7rem;">OBSIDIAN ULTRA // V2.2</p>
-        <div class="btn">
-            INITIALIZE AUDIO
-            <input type="file" id="audioInput" accept="audio/*">
+        <p class="sub-status">EXPERIMENTAL AUDIO ENGINE</p>
+        <div class="btn" style="position:relative;">
+            INITIALIZE ENGINE
+            <input type="file" id="audioInput" accept="audio/*" style="position:absolute; inset:0; opacity:0; cursor:pointer;">
         </div>
     </div>
 
-    <button id="pause-btn" class="btn btn-secondary control-hidden">Pause</button>
-    <button id="snapshot-btn" class="btn btn-secondary control-hidden">Capture Frame</button>
+    <div id="player-container" class="player-hidden">
+        <button id="playPause" class="play-pause-btn">PAUSE</button>
+        <input type="range" id="progressBar" value="0" step="0.1">
+        <span id="time" style="font-family: monospace; font-size: 0.7rem; opacity: 0.5;">00:00</span>
+    </div>
 
 <script>
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
+    const intro = document.getElementById('intro-overlay');
     const ui = document.getElementById('ui-layer');
-    const cursor = document.getElementById('cursor');
     const audioInput = document.getElementById('audioInput');
-    const pauseBtn = document.getElementById('pause-btn');
-    const snapshotBtn = document.getElementById('snapshot-btn');
+    const player = document.getElementById('player-container');
+    const progressBar = document.getElementById('progressBar');
+    const playPauseBtn = document.getElementById('playPause');
+    const timeDisplay = document.getElementById('time');
+    const cursor = document.getElementById('cursor');
 
-    let audioCtx, analyzer, frequencyData, source;
-    let isPlaying = false;
-    let mouse = { x: 0, y: 0 };
-    let rotation = 0;
+    let audioCtx, analyzer, source, frequencyData, audioBuffer;
+    let startTime = 0, pausedAt = 0, isPlaying = false, isInitialized = false;
 
-    function initCanvas() {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-    }
+    // Intro Sequence
+    window.onload = () => {
+        const lines = ["AUTHENTICATING", "BUILDING_MATRIX", "STABLE."];
+        let i = 0;
+        const log = setInterval(() => {
+            document.getElementById('terminal').innerText = `SYST_INIT: ${lines[i]}`;
+            if (++i === lines.length) {
+                clearInterval(log);
+                setTimeout(() => {
+                    intro.style.opacity = '0';
+                    setTimeout(() => intro.remove(), 1200);
+                }, 800);
+            }
+        }, 600);
+    };
+
+    function initCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
     window.addEventListener('resize', initCanvas);
     initCanvas();
 
-    // Custom Cursor & Smart Edge-Detection Fix
     window.addEventListener('mousemove', e => {
-        mouse.x = e.clientX;
-        mouse.y = e.clientY;
-        cursor.style.transform = `translate(${e.clientX - 10}px, ${e.clientY - 10}px)`;
-        
-        if (isPlaying) {
-            const edgeThreshold = 100; // Hover range to trigger UI
-            if (e.clientY < edgeThreshold || e.clientY > window.innerHeight - edgeThreshold) {
+        cursor.style.transform = `translate(${e.clientX - 7}px, ${e.clientY - 7}px)`;
+        if (isInitialized) {
+            const edge = 130;
+            if (e.clientY < edge || e.clientY > window.innerHeight - edge) {
                 ui.classList.remove('hidden');
+                player.classList.remove('player-hidden');
             } else {
                 ui.classList.add('hidden');
+                player.classList.add('player-hidden');
             }
         }
     });
 
-    audioInput.onchange = function() {
+    audioInput.onchange = function(e) {
         if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        
-        ui.classList.add('hidden');
-        pauseBtn.classList.remove('control-hidden');
-        snapshotBtn.classList.remove('control-hidden');
-
         const reader = new FileReader();
-        reader.onload = e => audioCtx.decodeAudioData(e.target.result, setupAudio);
+        reader.onload = e => audioCtx.decodeAudioData(e.target.result, buffer => {
+            audioBuffer = buffer;
+            progressBar.max = buffer.duration;
+            startPlayback(0);
+            isInitialized = true;
+            ui.classList.add('hidden');
+            render();
+        });
         reader.readAsArrayBuffer(this.files[0]);
     };
 
-    function setupAudio(buffer) {
+    function startPlayback(offset) {
         if (source) source.stop();
+        source = audioCtx.createBufferSource();
+        source.buffer = audioBuffer;
         analyzer = audioCtx.createAnalyser();
         analyzer.fftSize = 512;
-        source = audioCtx.createBufferSource();
-        source.buffer = buffer;
         source.connect(analyzer);
         analyzer.connect(audioCtx.destination);
-        source.start(0);
+        source.start(0, offset);
+        startTime = audioCtx.currentTime - offset;
         frequencyData = new Uint8Array(analyzer.frequencyBinCount);
         isPlaying = true;
-        render();
+        playPauseBtn.innerText = "PAUSE";
     }
 
-    // --- PAUSE LOGIC ---
-    pauseBtn.onclick = () => {
-        if (audioCtx.state === 'running') {
-            audioCtx.suspend().then(() => pauseBtn.innerText = "Resume");
-        } else if (audioCtx.state === 'suspended') {
-            audioCtx.resume().then(() => pauseBtn.innerText = "Pause");
-        }
-    };
+    progressBar.oninput = () => startPlayback(parseFloat(progressBar.value));
 
-    // --- CAPTURE LOGIC ---
-    snapshotBtn.onclick = () => {
-        const link = document.createElement('a');
-        link.download = `KYMATIX_EXTRACT_${Date.now()}.png`;
-        link.href = canvas.toDataURL();
-        link.click();
+    playPauseBtn.onclick = () => {
+        if (audioCtx.state === 'running') {
+            audioCtx.suspend();
+            playPauseBtn.innerText = "PLAY";
+        } else {
+            audioCtx.resume();
+            playPauseBtn.innerText = "PAUSE";
+        }
     };
 
     function render() {
-        if (!isPlaying) return;
         requestAnimationFrame(render);
-        
-        // Only run visual math if audio is playing
-        if (audioCtx.state !== 'running') return;
-
-        analyzer.getByteFrequencyData(frequencyData);
-        const bass = frequencyData[10];
-        ui.style.setProperty('--line-width', `${60 + bass * 0.9}px`);
-
-        // Atmospheric Depth
-        ctx.fillStyle = 'rgba(5, 5, 8, 0.18)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        rotation += 0.002;
-        const cx = canvas.width / 2;
-        const cy = canvas.height / 2;
-
-        for (let i = 0; i < 12; i++) {
-            ctx.save();
-            ctx.translate(cx, cy);
-            ctx.rotate((Math.PI * 2 / 12) * i + rotation);
+        if (audioCtx.state === 'running' && isPlaying) {
+            analyzer.getByteFrequencyData(frequencyData);
             
-            // Mouse Gravity Logic
-            const dx = (mouse.x - cx) * 0.04;
-            const dy = (mouse.y - cy) * 0.04;
-            ctx.translate(dx, dy);
+            const current = audioCtx.currentTime - startTime;
+            progressBar.value = current;
+            const mins = Math.floor(current / 60).toString().padStart(2, '0');
+            const secs = Math.floor(current % 60).toString().padStart(2, '0');
+            timeDisplay.innerText = `${mins}:${secs}`;
 
-            drawGenerativeLayer(frequencyData);
-            ctx.restore();
+            ctx.fillStyle = 'rgba(5, 5, 8, 0.18)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            const cx = canvas.width / 2, cy = canvas.height / 2;
+            ui.style.setProperty('--line-width', `${80 + frequencyData[10] * 0.8}px`);
+
+            for (let i = 0; i < 12; i++) {
+                ctx.save();
+                ctx.translate(cx, cy);
+                ctx.rotate((Math.PI * 2 / 12) * i + (Date.now() * 0.0005));
+                drawLayer(frequencyData);
+                ctx.restore();
+            }
         }
     }
 
-    function drawGenerativeLayer(data) {
+    function drawLayer(data) {
         ctx.beginPath();
-        const hue = (data[20] * 1.6) % 360;
-        ctx.strokeStyle = `hsla(${hue}, 85%, 65%, 0.8)`;
+        const hue = (data[20] * 1.5) % 360;
+        ctx.strokeStyle = `hsla(${hue}, 80%, 65%, 0.8)`;
         ctx.lineWidth = 2;
-        ctx.shadowBlur = 30;
-        ctx.shadowColor = `hsla(${hue}, 100%, 50%, 0.4)`;
-
-        for (let i = 0; i < data.length; i += 4) {
-            const mag = data[i] * 1.8;
-            const angle = (i / data.length) * Math.PI * 2;
-            const x = Math.cos(angle) * (mag + i);
-            const y = Math.sin(angle) * (mag + i);
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = ctx.strokeStyle;
+        for (let i = 0; i < data.length; i += 6) {
+            const r = data[i] * 1.5 + i;
+            const x = Math.cos(i) * r;
+            const y = Math.sin(i) * r;
             i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-            
-            if (data[i] > 230) ctx.strokeRect(x, y, 3, 3);
         }
         ctx.stroke();
     }
