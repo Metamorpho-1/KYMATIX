@@ -254,6 +254,43 @@
             text-transform:uppercase;
         }
         #track-badge.visible { opacity:1; }
+
+        /* ── SCRUBBER ── */
+        #scrubber-wrap {
+            position:fixed; bottom:100px; left:50%; transform:translateX(-50%);
+            z-index:200; width:min(520px, 80vw);
+            opacity:0; pointer-events:none;
+            transition:opacity 0.5s ease;
+            display:flex; align-items:center; gap:12px;
+        }
+        #scrubber-wrap.visible { opacity:1; pointer-events:all; }
+
+        .time-label {
+            font-size:0.65rem; letter-spacing:2px;
+            color:rgba(255,255,255,0.3); min-width:36px;
+            font-weight:800;
+        }
+        #scrubber {
+            flex:1; -webkit-appearance:none; appearance:none;
+            height:3px; border-radius:10px; outline:none; cursor:pointer;
+            background: linear-gradient(to right,
+                var(--accent) 0%,
+                var(--accent) var(--prog, 0%),
+                rgba(255,255,255,0.1) var(--prog, 0%),
+                rgba(255,255,255,0.1) 100%
+            );
+        }
+        #scrubber::-webkit-slider-thumb {
+            -webkit-appearance:none; width:14px; height:14px;
+            border-radius:50%; background:white; cursor:pointer;
+            box-shadow:0 0 10px rgba(247,208,138,0.6);
+            transition:transform 0.15s;
+        }
+        #scrubber:hover::-webkit-slider-thumb { transform:scale(1.3); }
+        #scrubber::-moz-range-thumb {
+            width:14px; height:14px; border:none;
+            border-radius:50%; background:white; cursor:pointer;
+        }
     </style>
 </head>
 <body>
@@ -289,9 +326,20 @@
 <!-- ── TRACK BADGE ── -->
 <div id="track-badge" id="track-badge">▶ —</div>
 
+<!-- ── SCRUBBER ── -->
+<div id="scrubber-wrap">
+    <span class="time-label" id="time-cur">0:00</span>
+    <input type="range" id="scrubber" min="0" max="100" value="0" step="0.1">
+    <span class="time-label" id="time-dur">0:00</span>
+</div>
+
 <!-- ── CONTROLS ── -->
 <div class="controls" id="controls">
     <button class="ctrl-btn" id="pause-btn">PLAYING</button>
+    <label class="ctrl-btn" style="cursor:pointer; position:relative;">
+        CHANGE SONG
+        <input type="file" id="changeInput" accept="audio/*" style="position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer;">
+    </label>
     <button class="ctrl-btn" id="snapshot-btn">CAPTURE</button>
 </div>
 
@@ -307,22 +355,28 @@
     const controls    = document.getElementById('controls');
     const intro       = document.getElementById('intro');
     const trackBadge  = document.getElementById('track-badge');
+    const scrubberWrap= document.getElementById('scrubber-wrap');
+    const scrubber    = document.getElementById('scrubber');
+    const timeCur     = document.getElementById('time-cur');
+    const timeDur     = document.getElementById('time-dur');
+    const changeInput = document.getElementById('changeInput');
 
     /* ── STATE ── */
-    let audioCtx, analyzer, frequencyData, waveData, source;
+    let audioCtx, analyzer, frequencyData, source;
+    let audioBuffer = null;       // store decoded buffer for scrubbing
+    let startedAt   = 0;          // audioCtx.currentTime when source started
+    let offsetAt    = 0;          // playback offset when last started/seeked
+    let isScrubbing = false;
     let isPlaying = false;
     let mouse = { x: window.innerWidth/2, y: window.innerHeight/2 };
     let rotation = 0;
-    let particlePool = [];
     let frameCount = 0;
 
     // ── BEAT DETECTION STATE ──
     let bassHistory = new Float32Array(30).fill(0);
     let bassHistIdx = 0;
-    let beatFlash = 0;        // 0..1, decays each frame
-    let beatScale = 1;        // zoom pulse on kick
+    let beatFlash = 0;
     let lastBeatTime = 0;
-    let shakeX = 0, shakeY = 0;
 
     /* ── CANVAS SIZE ── */
     function initCanvas() {
@@ -360,7 +414,7 @@
     });
 
     /* Enlarge cursor over interactive elements */
-    document.querySelectorAll('button, label, input').forEach(el => {
+    document.querySelectorAll('button, label, input, #scrubber').forEach(el => {
         el.addEventListener('mouseenter', () => cursorEl.classList.add('big'));
         el.addEventListener('mouseleave', () => cursorEl.classList.remove('big'));
     });
@@ -375,6 +429,7 @@
         ui.classList.remove('visible');
         ui.classList.add('hidden');
         controls.classList.add('visible');
+        scrubberWrap.classList.add('visible');
 
         const name = file.name.replace(/\.[^/.]+$/, '').toUpperCase();
         trackBadge.textContent = '▶ ' + name;
@@ -388,24 +443,75 @@
         reader.readAsArrayBuffer(file);
     };
 
-    function setupAudio(buffer) {
+    function setupAudio(buffer, offset) {
         if (source) { try { source.stop(); } catch(e){} }
 
+        audioBuffer = buffer;
+        offsetAt    = offset || 0;
+
         analyzer = audioCtx.createAnalyser();
-        analyzer.fftSize = 512;                    // smaller = faster response
-        analyzer.smoothingTimeConstant = 0.5;      // lower = snappier transients
+        analyzer.fftSize = 512;
+        analyzer.smoothingTimeConstant = 0.5;
 
         source = audioCtx.createBufferSource();
-        source.buffer = buffer;
+        source.buffer = audioBuffer;
         source.connect(analyzer);
         analyzer.connect(audioCtx.destination);
-        source.start(0);
+        source.start(0, offsetAt);
+        startedAt = audioCtx.currentTime;
 
         frequencyData = new Uint8Array(analyzer.frequencyBinCount);
-        waveData      = new Uint8Array(analyzer.fftSize);
+
+        // Init scrubber max
+        scrubber.max  = audioBuffer.duration;
+        scrubber.step = audioBuffer.duration / 1000;
+        timeDur.textContent = fmt(audioBuffer.duration);
+
         isPlaying = true;
-        render();
+        if (!renderRunning) render();
     }
+
+    /* ── FORMAT seconds → m:ss ── */
+    function fmt(s) {
+        const m = Math.floor(s / 60);
+        return `${m}:${String(Math.floor(s % 60)).padStart(2,'0')}`;
+    }
+
+    /* ── SCRUBBER INTERACTION ── */
+    scrubber.addEventListener('mousedown', () => { isScrubbing = true; });
+    scrubber.addEventListener('touchstart', () => { isScrubbing = true; });
+
+    scrubber.addEventListener('input', () => {
+        scrubber.style.setProperty('--prog', (scrubber.value / scrubber.max * 100) + '%');
+        timeCur.textContent = fmt(parseFloat(scrubber.value));
+    });
+
+    scrubber.addEventListener('change', () => {
+        isScrubbing = false;
+        if (!audioBuffer) return;
+        const seekTo = parseFloat(scrubber.value);
+        // Resume context if suspended so seek works
+        const wasRunning = audioCtx.state === 'running';
+        audioCtx.resume().then(() => {
+            setupAudio(audioBuffer, seekTo);
+            if (!wasRunning) audioCtx.suspend();
+        });
+    });
+
+    /* ── CHANGE SONG ── */
+    changeInput.onchange = function() {
+        const file = this.files[0];
+        if (!file) return;
+        const name = file.name.replace(/\.[^/.]+$/, '').toUpperCase();
+        trackBadge.textContent = '▶ ' + name;
+        pauseBtn.textContent = 'PLAYING';
+        pauseBtn.classList.remove('paused');
+        scrubber.value = 0;
+        scrubber.style.setProperty('--prog', '0%');
+        const reader = new FileReader();
+        reader.onload = e => audioCtx.decodeAudioData(e.target.result, buf => setupAudio(buf, 0));
+        reader.readAsArrayBuffer(file);
+    };
 
     /* ── PAUSE ── */
     pauseBtn.onclick = () => {
@@ -433,38 +539,12 @@
         link.click();
     };
 
-    /* ── PARTICLES ── */
-    function spawnParticle(x, y, hue, vel) {
-        particlePool.push({
-            x, y,
-            vx: (Math.random()-0.5)*vel,
-            vy: (Math.random()-0.5)*vel - Math.random()*2,
-            life: 1, hue, size: Math.random()*3+1
-        });
-    }
-
-    function updateParticles() {
-        for (let i = particlePool.length-1; i >= 0; i--) {
-            const p = particlePool[i];
-            p.x += p.vx; p.y += p.vy;
-            p.vy += 0.04; // gravity
-            p.life -= 0.018;
-            if (p.life <= 0) { particlePool.splice(i,1); continue; }
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI*2);
-            ctx.fillStyle = `hsla(${p.hue},90%,70%,${p.life * 0.6})`;
-            ctx.fill();
-        }
-    }
-
-    /* ── FREQUENCY BAND AVERAGES (proper ranges, not single noisy bins) ── */
+    /* ── FREQUENCY BAND AVERAGES ── */
     function getBands() {
-        // With fftSize=512, frequencyBinCount=256, each bin ~86Hz @ 44.1kHz
-        const sub  = avg(frequencyData, 1,  4);   // ~20–340 Hz  sub-bass
-        const bass = avg(frequencyData, 4,  12);  // ~340–1030 Hz bass
-        const mid  = avg(frequencyData, 12, 50);  // ~1–4.3 kHz  mids
-        const hi   = avg(frequencyData, 50, 130); // ~4.3–11 kHz highs
-        return { sub, bass, mid, hi };
+        const sub  = avg(frequencyData, 1,  4);
+        const bass = avg(frequencyData, 4,  12);
+        const mid  = avg(frequencyData, 12, 50);
+        return { sub, bass, mid };
     }
 
     function avg(arr, a, b) {
@@ -474,176 +554,111 @@
     }
 
     /* ── BEAT DETECTOR ── */
-    function detectBeat(bass) {
-        bassHistory[bassHistIdx++ % bassHistory.length] = bass;
-        const mean = bassHistory.reduce((a,b) => a+b, 0) / bassHistory.length;
+    function detectBeat(sub) {
+        bassHistory[bassHistIdx++ % bassHistory.length] = sub;
+        const mean = bassHistory.reduce((a, b) => a + b, 0) / bassHistory.length;
         const now  = performance.now();
-        // Beat = current bass > 1.4× rolling average AND 200ms since last beat
-        if (bass > mean * 1.4 && bass > 80 && now - lastBeatTime > 200) {
+        if (sub > mean * 1.4 && sub > 80 && now - lastBeatTime > 200) {
             lastBeatTime = now;
             return true;
         }
         return false;
     }
 
+    let renderRunning = false;
+
     /* ── RENDER ── */
     function render() {
-        if (!isPlaying) return;
+        renderRunning = true;
+        if (!isPlaying) { renderRunning = false; return; }
         requestAnimationFrame(render);
         frameCount++;
 
+        beatFlash = Math.max(0, beatFlash - 0.05);
+
         const running = audioCtx && audioCtx.state === 'running';
 
-        // Decay beat flash & scale even while paused
-        beatFlash  = Math.max(0, beatFlash  - 0.06);
-        beatScale  = 1 + (beatScale - 1) * 0.82;
-        shakeX    *= 0.75;
-        shakeY    *= 0.75;
+        // Tick scrubber
+        if (running && audioBuffer && !isScrubbing) {
+            const current = offsetAt + (audioCtx.currentTime - startedAt);
+            const clamped = Math.min(current, audioBuffer.duration);
+            scrubber.value = clamped;
+            scrubber.style.setProperty('--prog', (clamped / audioBuffer.duration * 100) + '%');
+            timeCur.textContent = fmt(clamped);
+        }
 
         if (!running) {
-            ctx.fillStyle = 'rgba(5,5,8,0.4)';
-            ctx.fillRect(0,0,canvas.width,canvas.height);
+            ctx.fillStyle = 'rgba(5,5,8,0.35)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
             return;
         }
 
         analyzer.getByteFrequencyData(frequencyData);
-        analyzer.getByteTimeDomainData(waveData);
+        const { sub, bass, mid } = getBands();
 
-        const { sub, bass, mid, hi } = getBands();
-
-        // Beat detection → trigger flash + shake + scale
         if (detectBeat(sub)) {
-            beatFlash = 1;
-            beatScale = 1 + sub / 255 * 0.18;
-            shakeX = (Math.random()-0.5) * sub * 0.12;
-            shakeY = (Math.random()-0.5) * sub * 0.12;
-            // Burst particles
-            const cx2 = canvas.width/2, cy2 = canvas.height/2;
-            for (let p=0; p<8; p++) {
-                const a = Math.random()*Math.PI*2;
-                const r = 80 + Math.random()*160;
-                spawnParticle(cx2+Math.cos(a)*r, cy2+Math.sin(a)*r, hueBase, sub*0.07);
-            }
+            beatFlash = 0.85;
         }
 
-        // Dynamic trail: shorter = crispier beat flashes
-        const trailAlpha = 0.12 + (1 - sub/255) * 0.1;
-        ctx.fillStyle = `rgba(5,5,8,${trailAlpha})`;
-        ctx.fillRect(0,0,canvas.width,canvas.height);
+        // Original atmospheric depth trail — slightly tighter on beats
+        ctx.fillStyle = `rgba(5,5,8,${0.18 - beatFlash * 0.05})`;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // Beat flash bloom overlay
+        // Subtle beat bloom — very faint, like original's glow quality
         if (beatFlash > 0.01) {
-            ctx.fillStyle = `rgba(247,208,138,${beatFlash * 0.07})`;
-            ctx.fillRect(0,0,canvas.width,canvas.height);
+            ctx.fillStyle = `rgba(247,208,138,${beatFlash * 0.04})`;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
 
-        rotation += 0.001 + sub * 0.00005;
+        rotation += 0.002;
+        const cx = canvas.width  / 2;
+        const cy = canvas.height / 2;
 
-        var hueBase = (frameCount * 0.3 + bass * 0.5) % 360;
+        // Accent bar breathes with bass
+        ui.style.setProperty('--line-width', `${60 + sub * 0.9}px`);
 
-        const cx = canvas.width  / 2 + shakeX;
-        const cy = canvas.height / 2 + shakeY;
-
-        /* ── ARMS (scaled by beat) ── */
-        const arms = 16;
-        for (let arm = 0; arm < arms; arm++) {
+        // 12 arms — exactly like the original
+        for (let i = 0; i < 12; i++) {
             ctx.save();
             ctx.translate(cx, cy);
-            ctx.rotate((Math.PI*2/arms)*arm + rotation);
-            ctx.scale(beatScale, beatScale);
+            ctx.rotate((Math.PI * 2 / 12) * i + rotation);
 
-            const dx = (mouse.x - canvas.width/2)  * 0.04;
-            const dy = (mouse.y - canvas.height/2) * 0.04;
+            // Mouse gravity
+            const dx = (mouse.x - cx) * 0.04;
+            const dy = (mouse.y - cy) * 0.04;
             ctx.translate(dx, dy);
 
-            drawArm(frequencyData, hueBase, arm, sub, bass);
+            drawGenerativeLayer(frequencyData, sub, mid);
             ctx.restore();
         }
-
-        /* ── WAVEFORM ── */
-        drawCenterWave(cx, cy, hueBase, bass, mid);
-
-        /* ── BASS EXPAND RING ── */
-        const ringR = 60 + sub * 1.8 * beatScale;
-        ctx.beginPath();
-        ctx.arc(cx, cy, ringR, 0, Math.PI*2);
-        ctx.strokeStyle = `hsla(${hueBase+30},100%,70%,${sub/350})`;
-        ctx.lineWidth = 1 + beatFlash * 3;
-        ctx.shadowBlur = 20 + beatFlash*40;
-        ctx.shadowColor = `hsla(${hueBase},100%,60%,0.8)`;
-        ctx.stroke();
-        ctx.shadowBlur = 0;
-
-        /* ── HI-FREQ SPARKS ── */
-        if (hi > 120 && frameCount % 2 === 0) {
-            const a = Math.random()*Math.PI*2;
-            const dist = 60 + Math.random()*250;
-            spawnParticle(cx+Math.cos(a)*dist, cy+Math.sin(a)*dist, hueBase+130, 2+hi*0.02);
-        }
-
-        updateParticles();
-
-        // Accent bar reacts to sub-bass
-        ui.style.setProperty('--line-width', `${60 + sub * 1.1}px`);
     }
 
-    function drawArm(data, hueBase, armIndex, sub, bass) {
+    /* ── DRAW — original style, beat-aware ── */
+    function drawGenerativeLayer(data, sub, mid) {
         ctx.beginPath();
 
-        const hue   = (hueBase + armIndex * 22) % 360;
-        const alpha = 0.5 + sub/400;
-        ctx.strokeStyle = `hsla(${hue},90%,68%,${alpha})`;
-        ctx.lineWidth   = 1 + sub/180;
-        ctx.shadowBlur  = 12 + sub * 0.12;
-        ctx.shadowColor = `hsla(${hue},100%,55%,0.6)`;
-        ctx.lineJoin    = 'round';
+        // Hue from data[20] like original, sub-bass nudges it on beats
+        const hue = (data[20] * 1.6 + beatFlash * 30) % 360;
 
-        // Use actual frequency data — mapped to spiral
-        const len = data.length;
-        for (let i=0; i < len; i += 4) {
-            const norm  = data[i] / 255;
-            const angle = (i / len) * Math.PI * 2;
-            // inner radius grows with bass so it breathes
-            const innerR = 30 + bass * 0.4;
-            const r     = innerR + norm * (180 + sub * 0.6);
-            const x     = Math.cos(angle) * r;
-            const y     = Math.sin(angle) * r;
-            i === 0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
-        }
-        ctx.stroke();
-    }
+        // Opacity breathes slightly with sub-bass
+        const alpha = 0.55 + sub / 500;
+        ctx.strokeStyle = `hsla(${hue}, 85%, 65%, ${alpha})`;
+        ctx.lineWidth = 1.5 + beatFlash * 0.8;
 
-    function drawCenterWave(cx, cy, hueBase, bass, mid) {
-        const len    = waveData.length;
-        const w      = Math.min(canvas.width * 0.6, 700);
-        const h      = 60 + mid * 0.8 + bass * 0.3;   // height drives with mids
-        const startX = cx - w/2;
+        // Glow intensifies on beat — otherwise stays gentle like original
+        ctx.shadowBlur  = 20 + beatFlash * 25;
+        ctx.shadowColor = `hsla(${hue}, 100%, 55%, ${0.3 + beatFlash * 0.3})`;
 
-        // Main waveform
-        ctx.beginPath();
-        ctx.lineWidth   = 1.5 + bass/120;
-        ctx.strokeStyle = `hsla(${hueBase},75%,78%,0.7)`;
-        ctx.shadowBlur  = 14;
-        ctx.shadowColor = `hsla(${hueBase},100%,65%,0.45)`;
+        for (let i = 0; i < data.length; i += 4) {
+            // Original formula, but magnitude expands slightly on beat
+            const mag   = data[i] * (1.8 + beatFlash * 0.25);
+            const angle = (i / data.length) * Math.PI * 2;
+            const x     = Math.cos(angle) * (mag + i);
+            const y     = Math.sin(angle) * (mag + i);
+            i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
 
-        for (let i=0; i<len; i++) {
-            const x = startX + (i/len)*w;
-            const v = (waveData[i]/128.0) - 1.0;
-            const y = cy + v * h;
-            i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
-        }
-        ctx.stroke();
-
-        // Mirror ghost
-        ctx.beginPath();
-        ctx.lineWidth   = 1;
-        ctx.strokeStyle = `hsla(${hueBase+160},60%,65%,0.2)`;
-        ctx.shadowBlur  = 0;
-        for (let i=0; i<len; i++) {
-            const x = startX + (i/len)*w;
-            const v = (waveData[i]/128.0) - 1.0;
-            const y = cy - v * h * 0.45;
-            i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+            // Original sparkle dots on peaks
+            if (data[i] > 230) ctx.strokeRect(x, y, 3, 3);
         }
         ctx.stroke();
         ctx.shadowBlur = 0;
