@@ -3,256 +3,585 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kymatix // Obsidian Ultra V3.2</title>
+    <title>Kymatix v2.3 // Obsidian Ultra</title>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
             --accent: #f7d08a;
-            --glass: rgba(15, 15, 26, 0.92);
-            --line-width: 80px;
+            --accent2: #e87878;
+            --glass: rgba(10, 10, 18, 0.88);
+            --line-width: 60px;
         }
 
-        /* 1. Global & Typography Reset */
-        * { 
-            margin: 0; padding: 0; box-sizing: border-box; 
-            overflow: hidden; font-family: 'Syne', sans-serif; 
-            user-select: none; -webkit-user-select: none;
-        }
+        * { margin:0; padding:0; box-sizing:border-box; font-family:'Syne',sans-serif; user-select:none; -webkit-user-select:none; }
+        body { background:#050508; cursor:none; overflow:hidden; }
 
-        body { background: #050508; color: white; cursor: none; }
-
-        /* Custom Interactive Cursor */
+        /* ── CURSOR ── */
         #cursor {
-            position: fixed; width: 14px; height: 14px; border: 2px solid var(--accent);
-            border-radius: 50%; pointer-events: none; z-index: 5000;
-            transition: transform 0.05s linear; mix-blend-mode: difference;
+            position:fixed; width:18px; height:18px;
+            border:1.5px solid var(--accent); border-radius:50%;
+            pointer-events:none; z-index:9999;
+            transition:transform 0.05s linear, width 0.2s, height 0.2s, border-color 0.2s;
+            mix-blend-mode:difference;
+        }
+        #cursor.big { width:40px; height:40px; border-color:rgba(247,208,138,0.5); }
+
+        /* ── CANVAS ── */
+        #canvas { position:fixed; top:0; left:0; z-index:1; }
+
+        /* ════════════════════════════════
+           INTRO SEQUENCE
+        ════════════════════════════════ */
+        #intro {
+            position:fixed; inset:0; z-index:500;
+            background:#050508;
+            display:flex; flex-direction:column;
+            align-items:center; justify-content:center;
+            gap:0;
         }
 
-        /* 2. THE INTRO OVERLAY */
-        #intro-overlay {
-            position: fixed; inset: 0; z-index: 2000; background: #050508;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            transition: opacity 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+        .intro-line {
+            overflow:hidden; position:relative;
         }
-        .terminal-text { font-family: monospace; font-size: 0.75rem; color: var(--accent); letter-spacing: 3px; margin-bottom: 20px; text-transform: uppercase; }
-        .loader-bar { width: 180px; height: 1px; background: rgba(255,255,255,0.1); position: relative; overflow: hidden; }
-        .loader-progress { position: absolute; width: 100%; height: 100%; background: var(--accent); left: -100%; animation: load 2s ease-in-out forwards; }
-        @keyframes load { to { left: 0; } }
 
-        /* 3. CENTRAL HUB (Unsqueezed) */
+        .intro-word {
+            display:inline-block;
+            font-size:clamp(4rem, 12vw, 10rem);
+            font-weight:800;
+            letter-spacing:-6px;
+            background: linear-gradient(135deg, #fff 0%, #888 100%);
+            -webkit-background-clip:text; background-clip:text;
+            -webkit-text-fill-color:transparent;
+            transform:translateY(110%);
+            animation: slideUp 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        .intro-sub {
+            font-size:0.7rem; letter-spacing:10px; color:rgba(255,255,255,0.25);
+            opacity:0; margin-top:20px;
+            animation: fadeUp 0.8s ease forwards 1.2s;
+        }
+
+        .intro-bar {
+            width:0; height:2px; background:var(--accent);
+            margin-top:30px;
+            box-shadow:0 0 30px var(--accent);
+            animation:barGrow 1.2s cubic-bezier(0.16,1,0.3,1) forwards 0.8s;
+        }
+
+        .intro-tagline {
+            font-size:0.65rem; letter-spacing:6px; color:rgba(255,255,255,0.15);
+            opacity:0; margin-top:16px;
+            animation: fadeUp 0.8s ease forwards 1.8s;
+        }
+
+        /* Scan-line effect over intro */
+        .intro-scan {
+            position:absolute; inset:0; pointer-events:none;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 3px,
+                rgba(0,0,0,0.07) 3px,
+                rgba(0,0,0,0.07) 4px
+            );
+        }
+
+        /* Glowing orb behind text */
+        .intro-orb {
+            position:absolute; width:500px; height:500px; border-radius:50%;
+            background: radial-gradient(circle, rgba(247,208,138,0.06) 0%, transparent 70%);
+            pointer-events:none;
+            animation: orbPulse 3s ease-in-out infinite;
+        }
+
+        /* Countdown ring */
+        .intro-ring {
+            position:absolute;
+            width:300px; height:300px;
+            border-radius:50%;
+            border:1px solid rgba(247,208,138,0.08);
+            animation: ringExpand 2s cubic-bezier(0.16,1,0.3,1) forwards 0.3s;
+            opacity:0;
+        }
+        .intro-ring:nth-child(2) { animation-delay:0.6s; }
+        .intro-ring:nth-child(3) { animation-delay:0.9s; }
+
+        @keyframes slideUp {
+            to { transform:translateY(0); }
+        }
+        @keyframes fadeUp {
+            from { opacity:0; transform:translateY(12px); }
+            to   { opacity:1; transform:translateY(0); }
+        }
+        @keyframes barGrow {
+            to { width:80px; }
+        }
+        @keyframes orbPulse {
+            0%,100% { transform:scale(1); opacity:0.5; }
+            50%      { transform:scale(1.15); opacity:1; }
+        }
+        @keyframes ringExpand {
+            from { opacity:0; transform:scale(0.5); }
+            to   { opacity:1; transform:scale(1); }
+        }
+        @keyframes introOut {
+            0%   { opacity:1; transform:scale(1); }
+            100% { opacity:0; transform:scale(1.04); pointer-events:none; }
+        }
+        .intro-exit {
+            animation: introOut 0.9s cubic-bezier(0.16,1,0.3,1) forwards !important;
+        }
+
+        /* ════════════════════════════════
+           MAIN UI PANEL
+        ════════════════════════════════ */
         #ui-layer {
-            position: fixed; z-index: 100; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: var(--glass); backdrop-filter: blur(45px);
-            border: 1px solid rgba(255,255,255,0.1);
-            padding: 80px 100px; border-radius: 45px; text-align: center;
-            box-shadow: 0 50px 120px rgba(0,0,0,0.9);
-            transition: all 0.7s cubic-bezier(0.19, 1, 0.22, 1);
-            min-width: 580px;
+            position:fixed; z-index:100;
+            top:50%; left:50%; transform:translate(-50%,-50%);
+            background:var(--glass); backdrop-filter:blur(60px);
+            border:1px solid rgba(255,255,255,0.07);
+            padding:60px 70px; border-radius:40px; text-align:center;
+            box-shadow:0 60px 140px rgba(0,0,0,0.95), 0 0 0 1px rgba(255,255,255,0.03);
+            transition:all 0.9s cubic-bezier(0.19,1,0.22,1);
+            opacity:0; visibility:hidden;
+            transform:translate(-50%,-48%) scale(0.96);
+        }
+        #ui-layer.visible {
+            opacity:1; visibility:visible;
+            transform:translate(-50%,-50%) scale(1);
+        }
+        #ui-layer.hidden {
+            opacity:0; visibility:hidden;
+            transform:translate(-50%,-45%) scale(0.95);
         }
 
         h1 {
-            font-size: 5.5rem; font-weight: 800; letter-spacing: 2px;
-            line-height: 1; margin: 0;
-            background: linear-gradient(to bottom, #fff 30%, #999 100%);
-            background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            font-size:5rem; font-weight:800; letter-spacing:-5px;
+            background:linear-gradient(to bottom, #fff, #666);
+            background-clip:text; -webkit-background-clip:text;
+            -webkit-text-fill-color:transparent;
+            line-height:1;
         }
-
         h1::after {
-            content: ''; display: block; width: var(--line-width); height: 4px;
-            background: var(--accent); margin: 30px auto 0; border-radius: 10px;
-            box-shadow: 0 0 30px var(--accent); transition: width 0.1s ease-out;
+            content:''; display:block; width:var(--line-width); height:4px;
+            background:var(--accent); margin:22px auto;
+            border-radius:10px; box-shadow:0 0 30px var(--accent);
+            transition:width 0.1s ease;
         }
 
-        .sub-status { letter-spacing: 10px; opacity: 0.3; margin-top: 15px; margin-bottom: 50px; font-size: 0.65rem; font-weight: 700; text-transform: uppercase; }
-
-        /* 4. DYNAMIC PLAYER OVERLAY */
-        #player-hub {
-            position: fixed; bottom: 50px; left: 50%; transform: translateX(-50%);
-            width: 500px; z-index: 101; background: var(--glass);
-            padding: 18px 30px; border-radius: 100px;
-            border: 1px solid rgba(255,255,255,0.12);
-            display: flex; align-items: center; gap: 25px;
-            transition: 0.5s ease;
+        .version-tag {
+            letter-spacing:8px; opacity:0.2;
+            margin-bottom:45px; font-size:0.65rem; color:white;
         }
 
-        .init-btn { background: white; color: black; padding: 20px 50px; border-radius: 100px; font-weight: 800; cursor: pointer; border: none; font-size: 0.8rem; letter-spacing: 1px; }
-        .control-btn { background: none; color: white; border: 1px solid rgba(255,255,255,0.2); min-width: 80px; padding: 10px; border-radius: 50px; cursor: pointer; font-size: 0.6rem; letter-spacing: 1px; text-transform: uppercase; }
-        
-        #snapshot-btn { position: fixed; bottom: 40px; right: 40px; z-index: 102; border-radius: 50px; padding: 12px 25px; font-size: 0.6rem; color: white; background: var(--glass); border: 1px solid rgba(255,255,255,0.1); cursor: pointer; backdrop-filter: blur(10px); }
+        .upload-btn {
+            position:relative; display:inline-block;
+            background:white; color:black;
+            padding:20px 45px; border-radius:100px;
+            font-weight:900; font-size:0.85rem;
+            letter-spacing:2px; text-transform:uppercase;
+            cursor:pointer; border:none;
+            transition:transform 0.3s, box-shadow 0.3s;
+        }
+        .upload-btn:hover {
+            transform:scale(1.05);
+            box-shadow:0 0 50px rgba(255,255,255,0.25);
+        }
+        .upload-btn input[type="file"] {
+            position:absolute; inset:0; opacity:0;
+            width:100%; height:100%; cursor:pointer;
+        }
 
-        input[type="range"] { flex-grow: 1; appearance: none; background: rgba(255,255,255,0.1); height: 2px; }
-        input[type="range"]::-webkit-slider-thumb { appearance: none; width: 8px; height: 8px; background: var(--accent); border-radius: 50%; box-shadow: 0 0 10px var(--accent); }
+        /* ════════════════════════════════
+           BOTTOM CONTROLS
+        ════════════════════════════════ */
+        .controls {
+            position:fixed; bottom:40px; left:50%; transform:translateX(-50%);
+            z-index:200;
+            display:flex; gap:16px; align-items:center;
+            opacity:0; pointer-events:none;
+            transition: opacity 0.5s ease;
+        }
+        .controls.visible {
+            opacity:1; pointer-events:all;
+        }
 
-        /* UI State Classes */
-        .hidden { opacity: 0; pointer-events: none; transform: translate(-50%, -45%) scale(0.98); }
-        .p-hidden { opacity: 0; transform: translate(-50%, 30px); pointer-events: none; }
+        .ctrl-btn {
+            background:rgba(255,255,255,0.05);
+            color:white; padding:14px 30px;
+            border-radius:100px; font-weight:800;
+            font-size:0.8rem; letter-spacing:2px;
+            border:1px solid rgba(255,255,255,0.1);
+            backdrop-filter:blur(20px); cursor:pointer;
+            transition:all 0.3s; text-transform:uppercase;
+        }
+        .ctrl-btn:hover {
+            background:rgba(255,255,255,0.12);
+            border-color:rgba(255,255,255,0.25);
+            transform:translateY(-2px);
+        }
+        .ctrl-btn.active {
+            background:rgba(247,208,138,0.12);
+            border-color:rgba(247,208,138,0.4);
+            color:var(--accent);
+        }
+
+        /* Pause indicator dot */
+        .ctrl-btn#pause-btn::before {
+            content:''; display:inline-block;
+            width:7px; height:7px; border-radius:50%;
+            background:#5ddf8a; margin-right:10px;
+            vertical-align:middle;
+            box-shadow:0 0 10px #5ddf8a;
+            transition: background 0.3s, box-shadow 0.3s;
+        }
+        .ctrl-btn#pause-btn.paused::before {
+            background:var(--accent2);
+            box-shadow:0 0 10px var(--accent2);
+        }
+
+        /* ── track name badge ── */
+        #track-badge {
+            position:fixed; top:36px; left:50%; transform:translateX(-50%);
+            z-index:200; opacity:0; pointer-events:none;
+            transition:opacity 0.6s ease;
+            background:rgba(255,255,255,0.04);
+            border:1px solid rgba(255,255,255,0.08);
+            backdrop-filter:blur(20px);
+            padding:10px 24px; border-radius:100px;
+            font-size:0.7rem; letter-spacing:4px; color:rgba(255,255,255,0.4);
+            text-transform:uppercase;
+        }
+        #track-badge.visible { opacity:1; }
     </style>
-    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet">
 </head>
 <body>
 
-    <div id="cursor"></div>
+<div id="cursor"></div>
+<canvas id="canvas"></canvas>
 
-    <div id="intro-overlay">
-        <div class="terminal-text" id="term-log">SYST_BOOT: KYMATIX_V3.2</div>
-        <div class="loader-bar"><div class="loader-progress"></div></div>
+<!-- ── INTRO ── -->
+<div id="intro">
+    <div class="intro-orb"></div>
+    <div class="intro-ring"></div>
+    <div class="intro-ring"></div>
+    <div class="intro-ring"></div>
+    <div class="intro-line">
+        <span class="intro-word" style="animation-delay:0.1s">KYMATIX</span>
     </div>
+    <p class="intro-sub">OBSIDIAN ULTRA // V2.3</p>
+    <div class="intro-bar"></div>
+    <p class="intro-tagline">REACTIVE AUDIO VISUALISER</p>
+    <div class="intro-scan"></div>
+</div>
 
-    <canvas id="canvas"></canvas>
+<!-- ── MAIN PANEL ── -->
+<div id="ui-layer">
+    <h1>KYMATIX</h1>
+    <p class="version-tag">OBSIDIAN ULTRA // V2.3</p>
+    <label class="upload-btn">
+        INITIALIZE AUDIO
+        <input type="file" id="audioInput" accept="audio/*">
+    </label>
+</div>
 
-    <div id="ui-layer">
-        <h1>KYMATIX</h1>
-        <p class="sub-status">EXPERIMENTAL AUDIO ENGINE</p>
-        <div class="init-btn" style="position:relative;">
-            INITIALIZE ENGINE
-            <input type="file" id="audioInput" accept="audio/*" style="position:absolute; inset:0; opacity:0; cursor:pointer;">
-        </div>
-    </div>
+<!-- ── TRACK BADGE ── -->
+<div id="track-badge" id="track-badge">▶ —</div>
 
-    <div id="player-hub" class="p-hidden">
-        <button id="pause-btn" class="control-btn">PAUSE</button>
-        <input type="range" id="progressBar" value="0" step="0.1">
-        <span id="time" style="font-family: monospace; font-size: 0.7rem; opacity: 0.4;">00:00</span>
-    </div>
-
-    <button id="snapshot-btn" class="p-hidden">CAPTURE FRAME</button>
+<!-- ── CONTROLS ── -->
+<div class="controls" id="controls">
+    <button class="ctrl-btn" id="pause-btn">PLAYING</button>
+    <button class="ctrl-btn" id="snapshot-btn">CAPTURE</button>
+</div>
 
 <script>
-    const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d');
-    const intro = document.getElementById('intro-overlay'), ui = document.getElementById('ui-layer');
-    const audioInput = document.getElementById('audioInput'), player = document.getElementById('player-hub');
-    const progressBar = document.getElementById('progressBar'), pauseBtn = document.getElementById('pause-btn');
-    const snapshotBtn = document.getElementById('snapshot-btn'), timeDisplay = document.getElementById('time');
-    const cursor = document.getElementById('cursor');
+    /* ── DOM ── */
+    const canvas      = document.getElementById('canvas');
+    const ctx         = canvas.getContext('2d');
+    const ui          = document.getElementById('ui-layer');
+    const cursorEl    = document.getElementById('cursor');
+    const audioInput  = document.getElementById('audioInput');
+    const pauseBtn    = document.getElementById('pause-btn');
+    const snapshotBtn = document.getElementById('snapshot-btn');
+    const controls    = document.getElementById('controls');
+    const intro       = document.getElementById('intro');
+    const trackBadge  = document.getElementById('track-badge');
 
-    let audioCtx, analyzer, source, frequencyData, audioBuffer;
-    let startTime = 0, isPlaying = false, isInitialized = false;
+    /* ── STATE ── */
+    let audioCtx, analyzer, frequencyData, source;
+    let isPlaying = false;
+    let mouse = { x: window.innerWidth/2, y: window.innerHeight/2 };
+    let rotation = 0;
+    let particlePool = [];
+    let frameCount = 0;
 
-    // 1. INTRO ENGINE
-    window.onload = () => {
-        const logs = ["AUTHENTICATING", "BUILDING_MATRIX", "STABLE."];
-        let i = 0;
-        const interval = setInterval(() => {
-            document.getElementById('term-log').innerText = `LOG: ${logs[i]}`;
-            if (++i === logs.length) {
-                clearInterval(interval);
-                setTimeout(() => {
-                    intro.style.opacity = '0';
-                    setTimeout(() => intro.remove(), 1200);
-                }, 800);
-            }
-        }, 700);
-    };
+    /* ── CANVAS SIZE ── */
+    function initCanvas() {
+        canvas.width  = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', initCanvas);
+    initCanvas();
 
-    function init() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
-    window.addEventListener('resize', init);
-    init();
+    /* ── INTRO → UI TRANSITION ── */
+    setTimeout(() => {
+        intro.classList.add('intro-exit');
+        setTimeout(() => {
+            intro.style.display = 'none';
+            ui.classList.add('visible');
+        }, 900);
+    }, 3200);
 
-    // 2. MOUSE & UI LOGIC
+    /* ── CURSOR ── */
     window.addEventListener('mousemove', e => {
-        cursor.style.transform = `translate(${e.clientX - 7}px, ${e.clientY - 7}px)`;
-        if (isInitialized) {
-            const edge = 140;
+        mouse.x = e.clientX;
+        mouse.y = e.clientY;
+        cursorEl.style.transform = `translate(${e.clientX - 9}px, ${e.clientY - 9}px)`;
+
+        if (isPlaying) {
+            const edge = 120;
             if (e.clientY < edge || e.clientY > window.innerHeight - edge) {
                 ui.classList.remove('hidden');
-                player.classList.remove('p-hidden');
-                snapshotBtn.classList.remove('p-hidden');
+                ui.classList.add('visible');
             } else {
+                ui.classList.remove('visible');
                 ui.classList.add('hidden');
-                player.classList.add('p-hidden');
-                snapshotBtn.classList.add('p-hidden');
             }
         }
     });
 
-    audioInput.onchange = function(e) {
+    /* Enlarge cursor over interactive elements */
+    document.querySelectorAll('button, label, input').forEach(el => {
+        el.addEventListener('mouseenter', () => cursorEl.classList.add('big'));
+        el.addEventListener('mouseleave', () => cursorEl.classList.remove('big'));
+    });
+
+    /* ── AUDIO LOAD ── */
+    audioInput.onchange = function () {
+        const file = this.files[0];
+        if (!file) return;
+
         if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        ui.classList.remove('visible');
+        ui.classList.add('hidden');
+        controls.classList.add('visible');
+
+        const name = file.name.replace(/\.[^/.]+$/, '').toUpperCase();
+        trackBadge.textContent = '▶ ' + name;
+        trackBadge.classList.add('visible');
+
+        pauseBtn.textContent  = 'PLAYING';
+        pauseBtn.classList.remove('paused');
+
         const reader = new FileReader();
-        reader.onload = e => audioCtx.decodeAudioData(e.target.result, buffer => {
-            audioBuffer = buffer;
-            progressBar.max = buffer.duration;
-            startPlayback(0);
-            isInitialized = true;
-            ui.classList.add('hidden');
-            render();
-        });
-        reader.readAsArrayBuffer(this.files[0]);
+        reader.onload = e => audioCtx.decodeAudioData(e.target.result, setupAudio);
+        reader.readAsArrayBuffer(file);
     };
 
-    function startPlayback(offset) {
-        if (source) source.stop();
-        source = audioCtx.createBufferSource();
-        source.buffer = audioBuffer;
+    function setupAudio(buffer) {
+        if (source) { try { source.stop(); } catch(e){} }
+
         analyzer = audioCtx.createAnalyser();
-        analyzer.fftSize = 512;
+        analyzer.fftSize = 1024;
+        analyzer.smoothingTimeConstant = 0.82;
+
+        source = audioCtx.createBufferSource();
+        source.buffer = buffer;
         source.connect(analyzer);
         analyzer.connect(audioCtx.destination);
-        source.start(0, offset);
-        startTime = audioCtx.currentTime - offset;
+        source.start(0);
+
         frequencyData = new Uint8Array(analyzer.frequencyBinCount);
         isPlaying = true;
-        pauseBtn.innerText = "PAUSE";
+        render();
     }
 
-    // 3. CONTROL LOGIC
+    /* ── PAUSE ── */
     pauseBtn.onclick = () => {
+        if (!audioCtx) return;
         if (audioCtx.state === 'running') {
-            audioCtx.suspend().then(() => pauseBtn.innerText = "PLAY");
+            audioCtx.suspend().then(() => {
+                pauseBtn.textContent = 'PAUSED';
+                pauseBtn.classList.add('paused');
+                trackBadge.textContent = trackBadge.textContent.replace('▶','⏸');
+            });
         } else {
-            audioCtx.resume().then(() => pauseBtn.innerText = "PAUSE");
+            audioCtx.resume().then(() => {
+                pauseBtn.textContent = 'PLAYING';
+                pauseBtn.classList.remove('paused');
+                trackBadge.textContent = trackBadge.textContent.replace('⏸','▶');
+            });
         }
     };
 
-    progressBar.oninput = () => startPlayback(parseFloat(progressBar.value));
-
+    /* ── SNAPSHOT ── */
     snapshotBtn.onclick = () => {
         const link = document.createElement('a');
-        link.download = `KYMATIX_ART_${Date.now()}.png`;
+        link.download = `KYMATIX_${Date.now()}.png`;
         link.href = canvas.toDataURL();
         link.click();
     };
 
-    // 4. RENDER LOOP (The "Blob-Fix" Engine)
-    function render() {
-        requestAnimationFrame(render);
-        if (audioCtx.state === 'running' && isPlaying) {
-            analyzer.getByteFrequencyData(frequencyData);
-            
-            // Progress Bar Update
-            const current = audioCtx.currentTime - startTime;
-            progressBar.value = current;
-            timeDisplay.innerText = `${Math.floor(current/60).toString().padStart(2,'0')}:${Math.floor(current%60).toString().padStart(2,'0')}`;
+    /* ── PARTICLES ── */
+    function spawnParticle(x, y, hue, vel) {
+        particlePool.push({
+            x, y,
+            vx: (Math.random()-0.5)*vel,
+            vy: (Math.random()-0.5)*vel - Math.random()*2,
+            life: 1, hue, size: Math.random()*3+1
+        });
+    }
 
-            // Surgical Wipe: Clear the canvas with high-alpha to prevent "blobbing"
-            ctx.fillStyle = 'rgba(5, 5, 8, 0.22)';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            const cx = canvas.width/2, cy = canvas.height/2;
-            ui.style.setProperty('--line-width', `${80 + frequencyData[10] * 0.9}px`);
-
-            for (let i = 0; i < 12; i++) {
-                ctx.save();
-                ctx.translate(cx, cy);
-                // Unified rotation based on time, not frame-count
-                ctx.rotate((Math.PI * 2 / 12) * i + (Date.now() * 0.0006));
-                
-                drawFractal(frequencyData);
-                ctx.restore();
-            }
+    function updateParticles() {
+        for (let i = particlePool.length-1; i >= 0; i--) {
+            const p = particlePool[i];
+            p.x += p.vx; p.y += p.vy;
+            p.vy += 0.04; // gravity
+            p.life -= 0.018;
+            if (p.life <= 0) { particlePool.splice(i,1); continue; }
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI*2);
+            ctx.fillStyle = `hsla(${p.hue},90%,70%,${p.life * 0.6})`;
+            ctx.fill();
         }
     }
 
-    function drawFractal(data) {
-        ctx.beginPath();
-        const hue = (data[20] * 1.5) % 360;
-        ctx.strokeStyle = `hsla(${hue}, 80%, 70%, 0.8)`;
-        ctx.lineWidth = 2.5;
-        ctx.shadowBlur = 25;
-        ctx.shadowColor = ctx.strokeStyle;
+    /* ── RENDER ── */
+    function render() {
+        if (!isPlaying) return;
+        requestAnimationFrame(render);
+        frameCount++;
 
-        for (let j = 0; j < data.length; j += 6) {
-            const r = data[j] * 1.6 + j;
-            const x = Math.cos(j) * r, y = Math.sin(j) * r;
-            j === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        analyzer.getByteFrequencyData(frequencyData);
+
+        const bass   = frequencyData[8];
+        const mid    = frequencyData[40];
+        const treble = frequencyData[110];
+
+        // Update accent bar width
+        ui.style.setProperty('--line-width', `${60 + bass * 0.8}px`);
+
+        const cx = canvas.width  / 2;
+        const cy = canvas.height / 2;
+
+        // Motion-blur trail
+        const running = audioCtx && audioCtx.state === 'running';
+        ctx.fillStyle = running ? 'rgba(5,5,8,0.15)' : 'rgba(5,5,8,0.5)';
+        ctx.fillRect(0,0,canvas.width,canvas.height);
+
+        if (!running) return;
+
+        rotation += 0.0015 + bass * 0.000025;
+
+        const hueBase = (frameCount * 0.4 + bass * 0.3) % 360;
+
+        /* ── OUTER FREQUENCY RING ── */
+        const arms = 16;
+        for (let arm = 0; arm < arms; arm++) {
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate((Math.PI*2/arms)*arm + rotation);
+
+            // Mouse gravity
+            const dx = (mouse.x - cx) * 0.035;
+            const dy = (mouse.y - cy) * 0.035;
+            ctx.translate(dx, dy);
+
+            drawArm(frequencyData, hueBase, arm, bass);
+            ctx.restore();
+        }
+
+        /* ── CENTRAL WAVEFORM ── */
+        drawCenterWave(cx, cy, hueBase, bass, mid);
+
+        /* ── BASS PULSE RING ── */
+        if (bass > 160) {
+            const r = bass * 1.4;
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI*2);
+            ctx.strokeStyle = `hsla(${hueBase+30},100%,70%,${(bass-160)/300})`;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            if (bass > 210 && frameCount % 3 === 0) {
+                for (let p=0;p<3;p++) {
+                    const a = Math.random()*Math.PI*2;
+                    spawnParticle(cx+Math.cos(a)*r, cy+Math.sin(a)*r, hueBase, bass*0.04);
+                }
+            }
+        }
+
+        /* ── TREBLE SPARKS ── */
+        if (treble > 180 && frameCount % 2 === 0) {
+            const a = Math.random()*Math.PI*2;
+            const dist = 80 + Math.random()*200;
+            spawnParticle(cx+Math.cos(a)*dist, cy+Math.sin(a)*dist, hueBase+120, 3);
+        }
+
+        updateParticles();
+    }
+
+    function drawArm(data, hueBase, armIndex, bass) {
+        ctx.beginPath();
+
+        const hue = (hueBase + armIndex * 22) % 360;
+        const alpha = 0.55 + bass/600;
+        ctx.strokeStyle = `hsla(${hue},85%,65%,${alpha})`;
+        ctx.lineWidth = 1.5;
+        ctx.shadowBlur = 18 + bass*0.06;
+        ctx.shadowColor = `hsla(${hue},100%,55%,0.5)`;
+        ctx.lineJoin = 'round';
+
+        const step = 6;
+        for (let i=0; i < data.length; i += step) {
+            const mag   = data[i] * 1.6;
+            const angle = (i / data.length) * Math.PI * 2;
+            const r     = mag + i * 0.35;
+            const x     = Math.cos(angle) * r;
+            const y     = Math.sin(angle) * r;
+            i === 0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+
+            // spiky highlight on peaks
+            if (data[i] > 220) {
+                ctx.strokeRect(x-1.5,y-1.5,3,3);
+            }
+        }
+        ctx.stroke();
+    }
+
+    function drawCenterWave(cx, cy, hueBase, bass, mid) {
+        const waveLen = 256;
+        const waveData = new Uint8Array(waveLen);
+        analyzer.getByteTimeDomainData(waveData);
+
+        const w = Math.min(canvas.width * 0.55, 600);
+        const h = 80 + mid * 0.5;
+        const startX = cx - w/2;
+
+        ctx.beginPath();
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = `hsla(${hueBase},70%,75%,0.55)`;
+        ctx.shadowBlur = 12;
+        ctx.shadowColor = `hsla(${hueBase},100%,60%,0.3)`;
+
+        for (let i=0; i<waveLen; i++) {
+            const x = startX + (i/waveLen)*w;
+            const v = (waveData[i]/128.0) - 1.0;
+            const y = cy + v * h;
+            i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+        }
+        ctx.stroke();
+
+        // Mirror
+        ctx.beginPath();
+        ctx.strokeStyle = `hsla(${hueBase+180},60%,70%,0.25)`;
+        for (let i=0; i<waveLen; i++) {
+            const x = startX + (i/waveLen)*w;
+            const v = (waveData[i]/128.0) - 1.0;
+            const y = cy - v * h * 0.5;
+            i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
         }
         ctx.stroke();
     }
