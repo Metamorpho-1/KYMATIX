@@ -7,78 +7,70 @@
     <style>
         :root {
             --accent: #f7d08a;
-            --glass: rgba(15, 15, 26, 0.88);
+            --glass: rgba(15, 15, 26, 0.92);
             --line-width: 80px;
         }
 
-        /* 1. Global & Typography Fix */
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Syne', sans-serif; user-select: none; }
         body { background: #050508; color: white; overflow: hidden; cursor: none; }
 
-        /* Custom Cursor */
-        #cursor { position: fixed; width: 15px; height: 15px; border: 2px solid var(--accent); border-radius: 50%; pointer-events: none; z-index: 3000; transition: transform 0.06s linear; mix-blend-mode: difference; }
+        #cursor { position: fixed; width: 12px; height: 12px; border: 2px solid var(--accent); border-radius: 50%; pointer-events: none; z-index: 5000; transition: transform 0.05s linear; mix-blend-mode: difference; }
 
-        /* 2. THE INTRO (Sleeker) */
+        /* 1. THE INTRO */
         #intro-overlay {
-            position: fixed; inset: 0; z-index: 2000;
-            background: #050508; display: flex; flex-direction: column;
-            align-items: center; justify-content: center;
-            transition: opacity 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+            position: fixed; inset: 0; z-index: 2000; background: #050508;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            transition: opacity 1s ease;
         }
-        .terminal-text { font-family: monospace; font-size: 0.75rem; color: var(--accent); margin-bottom: 20px; letter-spacing: 2px; text-transform: uppercase; }
-        .loader-bar { width: 180px; height: 1px; background: rgba(255,255,255,0.1); position: relative; overflow: hidden; }
-        .loader-progress { position: absolute; width: 100%; height: 100%; background: var(--accent); left: -100%; animation: load 2s ease-in-out forwards; }
+        .terminal-text { font-family: monospace; font-size: 0.7rem; color: var(--accent); letter-spacing: 3px; margin-bottom: 20px; }
+        .loader-bar { width: 150px; height: 1px; background: rgba(255,255,255,0.1); position: relative; overflow: hidden; }
+        .loader-progress { position: absolute; width: 100%; height: 100%; background: var(--accent); left: -100%; animation: load 1.8s ease-in-out forwards; }
         @keyframes load { to { left: 0; } }
 
-        /* 3. THE UI BOX (Restored & Unsqueezed) */
+        /* 2. THE UI (UNSQUEEZED) */
         #ui-layer {
-            position: fixed; z-index: 100;
-            top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: var(--glass); backdrop-filter: blur(40px);
-            border: 1px solid rgba(255,255,255,0.08);
-            padding: 70px 90px; border-radius: 40px; text-align: center;
-            box-shadow: 0 40px 100px rgba(0,0,0,0.8);
-            transition: all 0.8s cubic-bezier(0.19, 1, 0.22, 1);
-            width: auto; min-width: 500px;
+            position: fixed; z-index: 100; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: var(--glass); backdrop-filter: blur(45px);
+            border: 1px solid rgba(255,255,255,0.1);
+            padding: 80px 100px; border-radius: 45px; text-align: center;
+            box-shadow: 0 50px 120px rgba(0,0,0,0.9);
+            transition: all 0.7s cubic-bezier(0.19, 1, 0.22, 1);
+            min-width: 580px; /* Forces the box to stay wide */
         }
 
         h1 { 
-            font-size: 5.5rem; font-weight: 800; 
-            letter-spacing: -2px; /* Fixed: was too squeezed */
-            line-height: 1; margin: 0;
-            background: linear-gradient(to bottom, #fff, #888); 
-            background-clip: text; -webkit-background-clip: text; 
-            -webkit-text-fill-color: transparent; 
+            font-size: 6rem; font-weight: 800; letter-spacing: 2px; /* Increased for readability */
+            line-height: 1; margin-bottom: 10px;
+            background: linear-gradient(to bottom, #fff 30%, #999 100%);
+            background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent;
         }
 
         h1::after { 
-            content: ''; display: block; 
-            width: var(--line-width); height: 4px; 
-            background: var(--accent); margin: 30px auto 0; 
-            border-radius: 10px; box-shadow: 0 0 25px var(--accent); 
-            transition: width 0.15s ease-out; 
+            content: ''; display: block; width: var(--line-width); height: 4px; 
+            background: var(--accent); margin: 30px auto 0; border-radius: 10px;
+            box-shadow: 0 0 30px var(--accent); transition: width 0.1s ease-out;
         }
 
-        p.sub-status { letter-spacing: 6px; opacity: 0.4; margin-top: 15px; margin-bottom: 50px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; }
+        .sub-status { letter-spacing: 10px; opacity: 0.3; margin-bottom: 60px; font-size: 0.65rem; font-weight: 700; text-transform: uppercase; }
 
-        /* 4. THE PLAYER (Surgical Polish) */
-        #player-container {
+        /* 3. THE PLAYER (Sleek Overlay) */
+        #player-hub {
             position: fixed; bottom: 50px; left: 50%; transform: translateX(-50%);
-            width: 450px; z-index: 101; background: var(--glass);
-            padding: 15px 25px; border-radius: 100px;
-            backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1);
-            display: flex; align-items: center; gap: 20px;
-            transition: opacity 0.5s ease, transform 0.5s ease;
+            width: 500px; z-index: 101; background: var(--glass);
+            padding: 18px 30px; border-radius: 100px;
+            border: 1px solid rgba(255,255,255,0.12);
+            display: flex; align-items: center; gap: 25px;
+            transition: 0.5s ease;
         }
 
-        .btn { background: white; color: black; padding: 16px 35px; border-radius: 100px; font-weight: 800; cursor: pointer; border: none; font-size: 0.75rem; letter-spacing: 1px; }
-        .play-pause-btn { background: none; color: white; border: 1px solid rgba(255,255,255,0.2); width: 45px; height: 45px; border-radius: 50%; cursor: pointer; flex-shrink: 0; font-size: 0.6rem; display: flex; align-items: center; justify-content: center; }
+        .main-btn { background: white; color: black; padding: 20px 50px; border-radius: 100px; font-weight: 800; cursor: pointer; border: none; font-size: 0.8rem; letter-spacing: 1px; }
+        .control-btn { background: none; color: white; border: 1px solid rgba(255,255,255,0.2); min-width: 80px; padding: 10px; border-radius: 50px; cursor: pointer; font-size: 0.6rem; letter-spacing: 1px; }
 
-        input[type="range"] { flex-grow: 1; appearance: none; background: rgba(255,255,255,0.1); height: 2px; outline: none; }
-        input[type="range"]::-webkit-slider-thumb { appearance: none; width: 10px; height: 10px; background: var(--accent); border-radius: 50%; cursor: pointer; box-shadow: 0 0 10px var(--accent); }
+        input[type="range"] { flex-grow: 1; appearance: none; background: rgba(255,255,255,0.1); height: 2px; }
+        input[type="range"]::-webkit-slider-thumb { appearance: none; width: 8px; height: 8px; background: var(--accent); border-radius: 50%; box-shadow: 0 0 10px var(--accent); }
 
-        .hidden { opacity: 0; pointer-events: none; transform: translate(-50%, -40%) scale(0.95); }
-        .player-hidden { opacity: 0; transform: translate(-50%, 20px); pointer-events: none; }
+        .hidden { opacity: 0; pointer-events: none; transform: translate(-50%, -45%) scale(0.98); }
+        .p-hidden { opacity: 0; transform: translate(-50%, 30px); pointer-events: none; }
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet">
 </head>
@@ -87,7 +79,7 @@
     <div id="cursor"></div>
 
     <div id="intro-overlay">
-        <div class="terminal-text" id="terminal">SYST_INIT: KYMATIX_CORE</div>
+        <div class="terminal-text" id="term">SYST_BOOT: V3.2_STABLE</div>
         <div class="loader-bar"><div class="loader-progress"></div></div>
     </div>
 
@@ -95,64 +87,55 @@
 
     <div id="ui-layer">
         <h1>KYMATIX</h1>
-        <p class="sub-status">EXPERIMENTAL AUDIO ENGINE</p>
-        <div class="btn" style="position:relative;">
+        <p class="sub-status">REFINED GENERATIVE ENGINE</p>
+        <div class="main-btn" style="position:relative;">
             INITIALIZE ENGINE
             <input type="file" id="audioInput" accept="audio/*" style="position:absolute; inset:0; opacity:0; cursor:pointer;">
         </div>
     </div>
 
-    <div id="player-container" class="player-hidden">
-        <button id="playPause" class="play-pause-btn">PAUSE</button>
+    <div id="player-hub" class="p-hidden">
+        <button id="playPause" class="control-btn">PAUSE</button>
         <input type="range" id="progressBar" value="0" step="0.1">
-        <span id="time" style="font-family: monospace; font-size: 0.7rem; opacity: 0.5;">00:00</span>
+        <span id="time" style="font-family: monospace; font-size: 0.7rem; opacity: 0.4;">00:00</span>
     </div>
 
 <script>
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
-    const intro = document.getElementById('intro-overlay');
-    const ui = document.getElementById('ui-layer');
-    const audioInput = document.getElementById('audioInput');
-    const player = document.getElementById('player-container');
-    const progressBar = document.getElementById('progressBar');
-    const playPauseBtn = document.getElementById('playPause');
-    const timeDisplay = document.getElementById('time');
-    const cursor = document.getElementById('cursor');
+    const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d');
+    const intro = document.getElementById('intro-overlay'), ui = document.getElementById('ui-layer');
+    const audioInput = document.getElementById('audioInput'), player = document.getElementById('player-hub');
+    const progressBar = document.getElementById('progressBar'), playPauseBtn = document.getElementById('playPause');
+    const timeDisplay = document.getElementById('time'), cursor = document.getElementById('cursor');
 
     let audioCtx, analyzer, source, frequencyData, audioBuffer;
-    let startTime = 0, pausedAt = 0, isPlaying = false, isInitialized = false;
+    let startTime = 0, isPlaying = false, isInitialized = false;
 
-    // Intro Sequence
+    // 1. Boot Logic
     window.onload = () => {
-        const lines = ["AUTHENTICATING", "BUILDING_MATRIX", "STABLE."];
-        let i = 0;
-        const log = setInterval(() => {
-            document.getElementById('terminal').innerText = `SYST_INIT: ${lines[i]}`;
-            if (++i === lines.length) {
-                clearInterval(log);
-                setTimeout(() => {
-                    intro.style.opacity = '0';
-                    setTimeout(() => intro.remove(), 1200);
-                }, 800);
-            }
-        }, 600);
+        setTimeout(() => {
+            document.getElementById('term').innerText = "SYSTEM_GO.";
+            setTimeout(() => {
+                intro.style.opacity = '0';
+                setTimeout(() => intro.remove(), 1000);
+            }, 600);
+        }, 1800);
     };
 
-    function initCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
-    window.addEventListener('resize', initCanvas);
-    initCanvas();
+    function init() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+    window.addEventListener('resize', init);
+    init();
 
+    // 2. Interaction
     window.addEventListener('mousemove', e => {
-        cursor.style.transform = `translate(${e.clientX - 7}px, ${e.clientY - 7}px)`;
+        cursor.style.transform = `translate(${e.clientX - 6}px, ${e.clientY - 6}px)`;
         if (isInitialized) {
-            const edge = 130;
+            const edge = 140;
             if (e.clientY < edge || e.clientY > window.innerHeight - edge) {
                 ui.classList.remove('hidden');
-                player.classList.remove('player-hidden');
+                player.classList.remove('p-hidden');
             } else {
                 ui.classList.add('hidden');
-                player.classList.add('player-hidden');
+                player.classList.add('p-hidden');
             }
         }
     });
@@ -186,8 +169,6 @@
         playPauseBtn.innerText = "PAUSE";
     }
 
-    progressBar.oninput = () => startPlayback(parseFloat(progressBar.value));
-
     playPauseBtn.onclick = () => {
         if (audioCtx.state === 'running') {
             audioCtx.suspend();
@@ -198,47 +179,49 @@
         }
     };
 
+    progressBar.oninput = () => startPlayback(parseFloat(progressBar.value));
+
+    // 3. Render Loop (The Stability Fix)
     function render() {
         requestAnimationFrame(render);
         if (audioCtx.state === 'running' && isPlaying) {
             analyzer.getByteFrequencyData(frequencyData);
             
+            // Progress Math
             const current = audioCtx.currentTime - startTime;
             progressBar.value = current;
-            const mins = Math.floor(current / 60).toString().padStart(2, '0');
-            const secs = Math.floor(current % 60).toString().padStart(2, '0');
-            timeDisplay.innerText = `${mins}:${secs}`;
+            timeDisplay.innerText = `${Math.floor(current/60).toString().padStart(2,'0')}:${Math.floor(current%60).toString().padStart(2,'0')}`;
 
-            ctx.fillStyle = 'rgba(5, 5, 8, 0.18)';
+            // CLEAR CANVAS PROPERLY (Fixes the "Drift" bug)
+            ctx.fillStyle = 'rgba(5, 5, 8, 0.22)';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
-            const cx = canvas.width / 2, cy = canvas.height / 2;
-            ui.style.setProperty('--line-width', `${80 + frequencyData[10] * 0.8}px`);
+            const cx = canvas.width/2, cy = canvas.height/2;
+            const bass = frequencyData[10];
+            ui.style.setProperty('--line-width', `${80 + bass * 0.9}px`);
 
             for (let i = 0; i < 12; i++) {
                 ctx.save();
                 ctx.translate(cx, cy);
-                ctx.rotate((Math.PI * 2 / 12) * i + (Date.now() * 0.0005));
-                drawLayer(frequencyData);
+                ctx.rotate((Math.PI * 2 / 12) * i + (Date.now() * 0.0006));
+                
+                // Draw Geometric Core
+                ctx.beginPath();
+                const hue = (frequencyData[20] * 1.5) % 360;
+                ctx.strokeStyle = `hsla(${hue}, 80%, 70%, 0.8)`;
+                ctx.lineWidth = 2.5;
+                ctx.shadowBlur = 25;
+                ctx.shadowColor = ctx.strokeStyle;
+
+                for (let j = 0; j < frequencyData.length; j += 6) {
+                    const r = frequencyData[j] * 1.6 + j;
+                    const x = Math.cos(j) * r, y = Math.sin(j) * r;
+                    j === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+                }
+                ctx.stroke();
                 ctx.restore();
             }
         }
-    }
-
-    function drawLayer(data) {
-        ctx.beginPath();
-        const hue = (data[20] * 1.5) % 360;
-        ctx.strokeStyle = `hsla(${hue}, 80%, 65%, 0.8)`;
-        ctx.lineWidth = 2;
-        ctx.shadowBlur = 20;
-        ctx.shadowColor = ctx.strokeStyle;
-        for (let i = 0; i < data.length; i += 6) {
-            const r = data[i] * 1.5 + i;
-            const x = Math.cos(i) * r;
-            const y = Math.sin(i) * r;
-            i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-        }
-        ctx.stroke();
     }
 </script>
 </body>
