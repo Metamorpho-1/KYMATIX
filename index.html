@@ -309,12 +309,20 @@
     const trackBadge  = document.getElementById('track-badge');
 
     /* ── STATE ── */
-    let audioCtx, analyzer, frequencyData, source;
+    let audioCtx, analyzer, frequencyData, waveData, source;
     let isPlaying = false;
     let mouse = { x: window.innerWidth/2, y: window.innerHeight/2 };
     let rotation = 0;
     let particlePool = [];
     let frameCount = 0;
+
+    // ── BEAT DETECTION STATE ──
+    let bassHistory = new Float32Array(30).fill(0);
+    let bassHistIdx = 0;
+    let beatFlash = 0;        // 0..1, decays each frame
+    let beatScale = 1;        // zoom pulse on kick
+    let lastBeatTime = 0;
+    let shakeX = 0, shakeY = 0;
 
     /* ── CANVAS SIZE ── */
     function initCanvas() {
@@ -384,8 +392,8 @@
         if (source) { try { source.stop(); } catch(e){} }
 
         analyzer = audioCtx.createAnalyser();
-        analyzer.fftSize = 1024;
-        analyzer.smoothingTimeConstant = 0.82;
+        analyzer.fftSize = 512;                    // smaller = faster response
+        analyzer.smoothingTimeConstant = 0.5;      // lower = snappier transients
 
         source = audioCtx.createBufferSource();
         source.buffer = buffer;
@@ -394,6 +402,7 @@
         source.start(0);
 
         frequencyData = new Uint8Array(analyzer.frequencyBinCount);
+        waveData      = new Uint8Array(analyzer.fftSize);
         isPlaying = true;
         render();
     }
@@ -448,142 +457,196 @@
         }
     }
 
+    /* ── FREQUENCY BAND AVERAGES (proper ranges, not single noisy bins) ── */
+    function getBands() {
+        // With fftSize=512, frequencyBinCount=256, each bin ~86Hz @ 44.1kHz
+        const sub  = avg(frequencyData, 1,  4);   // ~20–340 Hz  sub-bass
+        const bass = avg(frequencyData, 4,  12);  // ~340–1030 Hz bass
+        const mid  = avg(frequencyData, 12, 50);  // ~1–4.3 kHz  mids
+        const hi   = avg(frequencyData, 50, 130); // ~4.3–11 kHz highs
+        return { sub, bass, mid, hi };
+    }
+
+    function avg(arr, a, b) {
+        let s = 0;
+        for (let i = a; i < b; i++) s += arr[i];
+        return s / (b - a);
+    }
+
+    /* ── BEAT DETECTOR ── */
+    function detectBeat(bass) {
+        bassHistory[bassHistIdx++ % bassHistory.length] = bass;
+        const mean = bassHistory.reduce((a,b) => a+b, 0) / bassHistory.length;
+        const now  = performance.now();
+        // Beat = current bass > 1.4× rolling average AND 200ms since last beat
+        if (bass > mean * 1.4 && bass > 80 && now - lastBeatTime > 200) {
+            lastBeatTime = now;
+            return true;
+        }
+        return false;
+    }
+
     /* ── RENDER ── */
     function render() {
         if (!isPlaying) return;
         requestAnimationFrame(render);
         frameCount++;
 
-        analyzer.getByteFrequencyData(frequencyData);
-
-        const bass   = frequencyData[8];
-        const mid    = frequencyData[40];
-        const treble = frequencyData[110];
-
-        // Update accent bar width
-        ui.style.setProperty('--line-width', `${60 + bass * 0.8}px`);
-
-        const cx = canvas.width  / 2;
-        const cy = canvas.height / 2;
-
-        // Motion-blur trail
         const running = audioCtx && audioCtx.state === 'running';
-        ctx.fillStyle = running ? 'rgba(5,5,8,0.15)' : 'rgba(5,5,8,0.5)';
+
+        // Decay beat flash & scale even while paused
+        beatFlash  = Math.max(0, beatFlash  - 0.06);
+        beatScale  = 1 + (beatScale - 1) * 0.82;
+        shakeX    *= 0.75;
+        shakeY    *= 0.75;
+
+        if (!running) {
+            ctx.fillStyle = 'rgba(5,5,8,0.4)';
+            ctx.fillRect(0,0,canvas.width,canvas.height);
+            return;
+        }
+
+        analyzer.getByteFrequencyData(frequencyData);
+        analyzer.getByteTimeDomainData(waveData);
+
+        const { sub, bass, mid, hi } = getBands();
+
+        // Beat detection → trigger flash + shake + scale
+        if (detectBeat(sub)) {
+            beatFlash = 1;
+            beatScale = 1 + sub / 255 * 0.18;
+            shakeX = (Math.random()-0.5) * sub * 0.12;
+            shakeY = (Math.random()-0.5) * sub * 0.12;
+            // Burst particles
+            const cx2 = canvas.width/2, cy2 = canvas.height/2;
+            for (let p=0; p<8; p++) {
+                const a = Math.random()*Math.PI*2;
+                const r = 80 + Math.random()*160;
+                spawnParticle(cx2+Math.cos(a)*r, cy2+Math.sin(a)*r, hueBase, sub*0.07);
+            }
+        }
+
+        // Dynamic trail: shorter = crispier beat flashes
+        const trailAlpha = 0.12 + (1 - sub/255) * 0.1;
+        ctx.fillStyle = `rgba(5,5,8,${trailAlpha})`;
         ctx.fillRect(0,0,canvas.width,canvas.height);
 
-        if (!running) return;
+        // Beat flash bloom overlay
+        if (beatFlash > 0.01) {
+            ctx.fillStyle = `rgba(247,208,138,${beatFlash * 0.07})`;
+            ctx.fillRect(0,0,canvas.width,canvas.height);
+        }
 
-        rotation += 0.0015 + bass * 0.000025;
+        rotation += 0.001 + sub * 0.00005;
 
-        const hueBase = (frameCount * 0.4 + bass * 0.3) % 360;
+        var hueBase = (frameCount * 0.3 + bass * 0.5) % 360;
 
-        /* ── OUTER FREQUENCY RING ── */
+        const cx = canvas.width  / 2 + shakeX;
+        const cy = canvas.height / 2 + shakeY;
+
+        /* ── ARMS (scaled by beat) ── */
         const arms = 16;
         for (let arm = 0; arm < arms; arm++) {
             ctx.save();
             ctx.translate(cx, cy);
             ctx.rotate((Math.PI*2/arms)*arm + rotation);
+            ctx.scale(beatScale, beatScale);
 
-            // Mouse gravity
-            const dx = (mouse.x - cx) * 0.035;
-            const dy = (mouse.y - cy) * 0.035;
+            const dx = (mouse.x - canvas.width/2)  * 0.04;
+            const dy = (mouse.y - canvas.height/2) * 0.04;
             ctx.translate(dx, dy);
 
-            drawArm(frequencyData, hueBase, arm, bass);
+            drawArm(frequencyData, hueBase, arm, sub, bass);
             ctx.restore();
         }
 
-        /* ── CENTRAL WAVEFORM ── */
+        /* ── WAVEFORM ── */
         drawCenterWave(cx, cy, hueBase, bass, mid);
 
-        /* ── BASS PULSE RING ── */
-        if (bass > 160) {
-            const r = bass * 1.4;
-            ctx.beginPath();
-            ctx.arc(cx, cy, r, 0, Math.PI*2);
-            ctx.strokeStyle = `hsla(${hueBase+30},100%,70%,${(bass-160)/300})`;
-            ctx.lineWidth = 1;
-            ctx.stroke();
+        /* ── BASS EXPAND RING ── */
+        const ringR = 60 + sub * 1.8 * beatScale;
+        ctx.beginPath();
+        ctx.arc(cx, cy, ringR, 0, Math.PI*2);
+        ctx.strokeStyle = `hsla(${hueBase+30},100%,70%,${sub/350})`;
+        ctx.lineWidth = 1 + beatFlash * 3;
+        ctx.shadowBlur = 20 + beatFlash*40;
+        ctx.shadowColor = `hsla(${hueBase},100%,60%,0.8)`;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
 
-            if (bass > 210 && frameCount % 3 === 0) {
-                for (let p=0;p<3;p++) {
-                    const a = Math.random()*Math.PI*2;
-                    spawnParticle(cx+Math.cos(a)*r, cy+Math.sin(a)*r, hueBase, bass*0.04);
-                }
-            }
-        }
-
-        /* ── TREBLE SPARKS ── */
-        if (treble > 180 && frameCount % 2 === 0) {
+        /* ── HI-FREQ SPARKS ── */
+        if (hi > 120 && frameCount % 2 === 0) {
             const a = Math.random()*Math.PI*2;
-            const dist = 80 + Math.random()*200;
-            spawnParticle(cx+Math.cos(a)*dist, cy+Math.sin(a)*dist, hueBase+120, 3);
+            const dist = 60 + Math.random()*250;
+            spawnParticle(cx+Math.cos(a)*dist, cy+Math.sin(a)*dist, hueBase+130, 2+hi*0.02);
         }
 
         updateParticles();
+
+        // Accent bar reacts to sub-bass
+        ui.style.setProperty('--line-width', `${60 + sub * 1.1}px`);
     }
 
-    function drawArm(data, hueBase, armIndex, bass) {
+    function drawArm(data, hueBase, armIndex, sub, bass) {
         ctx.beginPath();
 
-        const hue = (hueBase + armIndex * 22) % 360;
-        const alpha = 0.55 + bass/600;
-        ctx.strokeStyle = `hsla(${hue},85%,65%,${alpha})`;
-        ctx.lineWidth = 1.5;
-        ctx.shadowBlur = 18 + bass*0.06;
-        ctx.shadowColor = `hsla(${hue},100%,55%,0.5)`;
-        ctx.lineJoin = 'round';
+        const hue   = (hueBase + armIndex * 22) % 360;
+        const alpha = 0.5 + sub/400;
+        ctx.strokeStyle = `hsla(${hue},90%,68%,${alpha})`;
+        ctx.lineWidth   = 1 + sub/180;
+        ctx.shadowBlur  = 12 + sub * 0.12;
+        ctx.shadowColor = `hsla(${hue},100%,55%,0.6)`;
+        ctx.lineJoin    = 'round';
 
-        const step = 6;
-        for (let i=0; i < data.length; i += step) {
-            const mag   = data[i] * 1.6;
-            const angle = (i / data.length) * Math.PI * 2;
-            const r     = mag + i * 0.35;
+        // Use actual frequency data — mapped to spiral
+        const len = data.length;
+        for (let i=0; i < len; i += 4) {
+            const norm  = data[i] / 255;
+            const angle = (i / len) * Math.PI * 2;
+            // inner radius grows with bass so it breathes
+            const innerR = 30 + bass * 0.4;
+            const r     = innerR + norm * (180 + sub * 0.6);
             const x     = Math.cos(angle) * r;
             const y     = Math.sin(angle) * r;
             i === 0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
-
-            // spiky highlight on peaks
-            if (data[i] > 220) {
-                ctx.strokeRect(x-1.5,y-1.5,3,3);
-            }
         }
         ctx.stroke();
     }
 
     function drawCenterWave(cx, cy, hueBase, bass, mid) {
-        const waveLen = 256;
-        const waveData = new Uint8Array(waveLen);
-        analyzer.getByteTimeDomainData(waveData);
-
-        const w = Math.min(canvas.width * 0.55, 600);
-        const h = 80 + mid * 0.5;
+        const len    = waveData.length;
+        const w      = Math.min(canvas.width * 0.6, 700);
+        const h      = 60 + mid * 0.8 + bass * 0.3;   // height drives with mids
         const startX = cx - w/2;
 
+        // Main waveform
         ctx.beginPath();
-        ctx.lineWidth = 1.5;
-        ctx.strokeStyle = `hsla(${hueBase},70%,75%,0.55)`;
-        ctx.shadowBlur = 12;
-        ctx.shadowColor = `hsla(${hueBase},100%,60%,0.3)`;
+        ctx.lineWidth   = 1.5 + bass/120;
+        ctx.strokeStyle = `hsla(${hueBase},75%,78%,0.7)`;
+        ctx.shadowBlur  = 14;
+        ctx.shadowColor = `hsla(${hueBase},100%,65%,0.45)`;
 
-        for (let i=0; i<waveLen; i++) {
-            const x = startX + (i/waveLen)*w;
+        for (let i=0; i<len; i++) {
+            const x = startX + (i/len)*w;
             const v = (waveData[i]/128.0) - 1.0;
             const y = cy + v * h;
             i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
         }
         ctx.stroke();
 
-        // Mirror
+        // Mirror ghost
         ctx.beginPath();
-        ctx.strokeStyle = `hsla(${hueBase+180},60%,70%,0.25)`;
-        for (let i=0; i<waveLen; i++) {
-            const x = startX + (i/waveLen)*w;
+        ctx.lineWidth   = 1;
+        ctx.strokeStyle = `hsla(${hueBase+160},60%,65%,0.2)`;
+        ctx.shadowBlur  = 0;
+        for (let i=0; i<len; i++) {
+            const x = startX + (i/len)*w;
             const v = (waveData[i]/128.0) - 1.0;
-            const y = cy - v * h * 0.5;
+            const y = cy - v * h * 0.45;
             i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
         }
         ctx.stroke();
+        ctx.shadowBlur = 0;
     }
 </script>
 </body>
