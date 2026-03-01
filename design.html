@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kymatix v2.2 // Obsidian Ultra</title>
+    <style>
+        :root {
+            --accent: #f7d08a;
+            --glass: rgba(15, 15, 26, 0.85);
+            --line-width: 60px;
+        }
+
+        /* 1. Reset & Global Aesthetics */
+        * { 
+            margin: 0; padding: 0; box-sizing: border-box; 
+            overflow: hidden; font-family: 'Syne', sans-serif; 
+            user-select: none; -webkit-user-select: none;
+        }
+
+        body { background: #050508; cursor: none; }
+
+        /* Custom Interactive Cursor */
+        #cursor {
+            position: fixed; width: 20px; height: 20px; border: 2px solid var(--accent);
+            border-radius: 50%; pointer-events: none; z-index: 1000;
+            transition: transform 0.05s linear; mix-blend-mode: difference;
+        }
+
+        /* 2. Central Control Hub */
+        #ui-layer {
+            position: fixed; z-index: 100;
+            top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: var(--glass); backdrop-filter: blur(50px);
+            border: 1px solid rgba(255,255,255,0.08);
+            padding: 60px; border-radius: 40px; text-align: center;
+            box-shadow: 0 50px 120px rgba(0,0,0,0.9);
+            transition: all 0.8s cubic-bezier(0.19, 1, 0.22, 1);
+        }
+
+        h1 {
+            font-size: 5rem; font-weight: 800; letter-spacing: -5px;
+            background: linear-gradient(to bottom, #fff, #777);
+            background-clip: text; -webkit-background-clip: text; 
+            -webkit-text-fill-color: transparent;
+        }
+
+        h1::after {
+            content: ''; display: block; width: var(--line-width); height: 5px;
+            background: var(--accent); margin: 25px auto; border-radius: 10px;
+            box-shadow: 0 0 30px var(--accent); transition: width 0.1s ease;
+        }
+
+        /* 3. Button Styles */
+        .btn {
+            background: white; color: black; padding: 20px 45px;
+            border-radius: 100px; font-weight: 900; cursor: pointer;
+            transition: 0.3s; border: none; text-transform: uppercase;
+            font-size: 0.9rem; letter-spacing: 1px;
+        }
+
+        .btn:hover { transform: scale(1.05); box-shadow: 0 0 40px rgba(255,255,255,0.2); }
+
+        .btn-secondary {
+            position: fixed; bottom: 40px; z-index: 101;
+            background: rgba(255, 255, 255, 0.05); color: white;
+            padding: 15px 35px; border-radius: 100px; font-weight: 800;
+            border: 1px solid rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px);
+        }
+
+        #pause-btn { left: 40px; }
+        #snapshot-btn { right: 40px; }
+
+        input[type="file"] { position: absolute; opacity: 0; width: 100%; height: 100%; left:0; top:0; cursor: pointer;}
+
+        /* Logic classes */
+        .hidden { opacity: 0; visibility: hidden; transform: translate(-50%, -45%) scale(0.95); }
+        .control-hidden { opacity: 0; pointer-events: none; }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <div id="cursor"></div>
+    <canvas id="canvas"></canvas>
+
+    <div id="ui-layer">
+        <h1>KYMATIX</h1>
+        <p style="letter-spacing: 8px; opacity: 0.3; margin-bottom: 45px; font-size: 0.7rem;">OBSIDIAN ULTRA // V2.2</p>
+        <div class="btn">
+            INITIALIZE AUDIO
+            <input type="file" id="audioInput" accept="audio/*">
+        </div>
+    </div>
+
+    <button id="pause-btn" class="btn btn-secondary control-hidden">Pause</button>
+    <button id="snapshot-btn" class="btn btn-secondary control-hidden">Capture Frame</button>
+
+<script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const ui = document.getElementById('ui-layer');
+    const cursor = document.getElementById('cursor');
+    const audioInput = document.getElementById('audioInput');
+    const pauseBtn = document.getElementById('pause-btn');
+    const snapshotBtn = document.getElementById('snapshot-btn');
+
+    let audioCtx, analyzer, frequencyData, source;
+    let isPlaying = false;
+    let mouse = { x: 0, y: 0 };
+    let rotation = 0;
+
+    function initCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', initCanvas);
+    initCanvas();
+
+    // Custom Cursor & Smart Edge-Detection Fix
+    window.addEventListener('mousemove', e => {
+        mouse.x = e.clientX;
+        mouse.y = e.clientY;
+        cursor.style.transform = `translate(${e.clientX - 10}px, ${e.clientY - 10}px)`;
+        
+        if (isPlaying) {
+            const edgeThreshold = 100; // Hover range to trigger UI
+            if (e.clientY < edgeThreshold || e.clientY > window.innerHeight - edgeThreshold) {
+                ui.classList.remove('hidden');
+            } else {
+                ui.classList.add('hidden');
+            }
+        }
+    });
+
+    audioInput.onchange = function() {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        ui.classList.add('hidden');
+        pauseBtn.classList.remove('control-hidden');
+        snapshotBtn.classList.remove('control-hidden');
+
+        const reader = new FileReader();
+        reader.onload = e => audioCtx.decodeAudioData(e.target.result, setupAudio);
+        reader.readAsArrayBuffer(this.files[0]);
+    };
+
+    function setupAudio(buffer) {
+        if (source) source.stop();
+        analyzer = audioCtx.createAnalyser();
+        analyzer.fftSize = 512;
+        source = audioCtx.createBufferSource();
+        source.buffer = buffer;
+        source.connect(analyzer);
+        analyzer.connect(audioCtx.destination);
+        source.start(0);
+        frequencyData = new Uint8Array(analyzer.frequencyBinCount);
+        isPlaying = true;
+        render();
+    }
+
+    // --- PAUSE LOGIC ---
+    pauseBtn.onclick = () => {
+        if (audioCtx.state === 'running') {
+            audioCtx.suspend().then(() => pauseBtn.innerText = "Resume");
+        } else if (audioCtx.state === 'suspended') {
+            audioCtx.resume().then(() => pauseBtn.innerText = "Pause");
+        }
+    };
+
+    // --- CAPTURE LOGIC ---
+    snapshotBtn.onclick = () => {
+        const link = document.createElement('a');
+        link.download = `KYMATIX_EXTRACT_${Date.now()}.png`;
+        link.href = canvas.toDataURL();
+        link.click();
+    };
+
+    function render() {
+        if (!isPlaying) return;
+        requestAnimationFrame(render);
+        
+        // Only run visual math if audio is playing
+        if (audioCtx.state !== 'running') return;
+
+        analyzer.getByteFrequencyData(frequencyData);
+        const bass = frequencyData[10];
+        ui.style.setProperty('--line-width', `${60 + bass * 0.9}px`);
+
+        // Atmospheric Depth
+        ctx.fillStyle = 'rgba(5, 5, 8, 0.18)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        rotation += 0.002;
+        const cx = canvas.width / 2;
+        const cy = canvas.height / 2;
+
+        for (let i = 0; i < 12; i++) {
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate((Math.PI * 2 / 12) * i + rotation);
+            
+            // Mouse Gravity Logic
+            const dx = (mouse.x - cx) * 0.04;
+            const dy = (mouse.y - cy) * 0.04;
+            ctx.translate(dx, dy);
+
+            drawGenerativeLayer(frequencyData);
+            ctx.restore();
+        }
+    }
+
+    function drawGenerativeLayer(data) {
+        ctx.beginPath();
+        const hue = (data[20] * 1.6) % 360;
+        ctx.strokeStyle = `hsla(${hue}, 85%, 65%, 0.8)`;
+        ctx.lineWidth = 2;
+        ctx.shadowBlur = 30;
+        ctx.shadowColor = `hsla(${hue}, 100%, 50%, 0.4)`;
+
+        for (let i = 0; i < data.length; i += 4) {
+            const mag = data[i] * 1.8;
+            const angle = (i / data.length) * Math.PI * 2;
+            const x = Math.cos(angle) * (mag + i);
+            const y = Math.sin(angle) * (mag + i);
+            i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+            
+            if (data[i] > 230) ctx.strokeRect(x, y, 3, 3);
+        }
+        ctx.stroke();
+    }
+</script>
+</body>
+</html>
